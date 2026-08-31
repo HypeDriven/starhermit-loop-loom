@@ -1,0 +1,74 @@
+[
+  {
+    "name": "loop-lift",
+    "seconds": 1,
+    "prompt": "A soft woven fabric loop being lifted off a brass peg: gentle cloth rustle ending in a light metallic tick, close-miked, dry studio recording.",
+    "event": "select"
+  },
+  {
+    "name": "loop-lower",
+    "seconds": 1,
+    "prompt": "A soft fabric loop settling back down onto a wooden peg: muted cloth flop with a faint woody knock, quiet and dry.",
+    "event": "deselect"
+  },
+  {
+    "name": "loop-place",
+    "seconds": 1,
+    "prompt": "A yarn loop dropped onto a brass peg: soft fabric thud followed by a short delicate metal ring, single clean take.",
+    "event": "move"
+  },
+  {
+    "name": "loop-settle",
+    "seconds": 1,
+    "prompt": "Alternate take of a yarn loop landing on a peg: gentler cotton whump with a low brass ping, slightly softer than a firm placement.",
+    "event": "move"
+  },
+  {
+    "name": "move-denied",
+    "seconds": 1,
+    "prompt": "A dull muted double knock on a wooden loom frame signaling refusal: two short low thuds, no ringing, dry and flat.",
+    "event": "invalid"
+  },
+  {
+    "name": "peg-complete",
+    "seconds": 2,
+    "prompt": "A bright small bell chime with a sparkle of glass beads as one peg is finished: cheerful ascending shimmer, one clean hit with a short tail.",
+    "event": "complete-peg"
+  },
+  {
+    "name": "loom-finished",
+    "seconds": 3,
+    "prompt": "A short triumphant bell arpeggio rising through four notes with a warm glockenspiel shimmer and a gentle fabric swish underneath, celebratory but cozy.",
+    "event": "win"
+  },
+  {
+    "name": "round-over",
+    "seconds": 2,
+    "prompt": "A soft descending two-note sigh on a muted wooden marimba with a faint cloth rustle, calm and slightly disappointed, no harshness.",
+    "event": "lose"
+  },
+  {
+    "name": "move-undone",
+    "seconds": 1,
+    "prompt": "A quick reverse whoosh of fabric being pulled backward with a soft upward metallic flick, like a thread being unwound from a spool.",
+    "event": "undo"
+  },
+  {
+    "name": "hint-chime",
+    "seconds": 1,
+    "prompt": "A single soft glass ping with a gentle shimmering tail, like a fingertip tapped on a small crystal glass, friendly and unobtrusive.",
+    "event": "hint"
+  },
+  {
+    "name": "ui-click",
+    "seconds": 1,
+    "prompt": "A short crisp wooden toggle click, like a small loom shuttle switch being flipped, very brief and dry.",
+    "event": "click"
+  },
+  {
+    "name": "achievement-unlock",
+    "seconds": 2,
+    "prompt": "A small two-bell fanfare with a bright metallic sparkle and a soft felt mallet hit, like a tiny award ribbon being pinned, warm and rewarding.",
+    "event": "achievement"
+  }
+]

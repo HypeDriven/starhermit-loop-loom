@@ -1,0 +1,19 @@
+{
+  "name": "loop-loom",
+  "version": "1.0.0",
+  "description": "Loop Loom — ordering puzzle in a textile atelier.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --outfile=lib/bundle.js --format=esm --minify --legal-comments=none",
+    "test": "npm run build && node --test test/*.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/three": "^0.185.4",
+    "esbuild": "^0.28.2",
+    "three": "^0.169.0"
+  }
+}

@@ -1,0 +1,3 @@
+name=Loop Loom
+launch=index.html
+server=server.js
