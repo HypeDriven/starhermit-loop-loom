@@ -10,7 +10,7 @@ export function isSynced() { return synced; }
 // Fetch server time; returns null when the host API is unavailable (offline).
 export async function fetchServerTime(fetchImpl) {
   const f = fetchImpl || (typeof fetch !== 'undefined' ? fetch : null);
-  if (!f) return null;
+  if (!f || (typeof location !== 'undefined' && /^[0-9a-f-]{36}\.starhermit\.com$/i.test(location.hostname))) return null;
   try {
     const t0 = Date.now();
     const r = await f('/api/v1/time', { method: 'GET' });

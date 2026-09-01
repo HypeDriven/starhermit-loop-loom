@@ -797,7 +797,7 @@ function wireButtons() {
   click('btn-settings-close', () => setScreen(appState === 'paused' ? 'pause' : 'title'));
   click('btn-help-pause', () => showHelp('pause'));
   click('btn-help-close', () => setScreen(helpReturn));
-  click('btn-retry', () => { session.track('retry'); startRound(current.record, current.mode); });
+  click('btn-retry', () => { if (!current) return; session.track('retry'); startRound(current.record, current.mode); });
   click('btn-results-title', () => { transition('title', 'results closed'); setScreen('title'); refreshTitle(); });
   click('btn-undo', doUndo);
   click('btn-hint', doHint);
@@ -806,7 +806,7 @@ function wireButtons() {
   click('tray-help', () => showHelp('play'));
   click('tray-panel', () => $('rail-right').classList.toggle('drawer-open'));
   click('btn-drawer-left', () => $('rail-left').classList.toggle('drawer-open'));
-  click('btn-restart', () => startRound(current.record, current.mode));
+  click('btn-restart', () => { if (current) startRound(current.record, current.mode); });
   click('btn-settle', () => render.settle());
   click('btn-replay-tutorial', () => { setScreen('title'); openSetup('learn', content.getLesson(0)); });
   click('btn-compat-close', () => { setScreen(current ? 'play' : 'title'); });

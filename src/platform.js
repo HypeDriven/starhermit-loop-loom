@@ -28,6 +28,9 @@ export function handshake() {
 }
 
 async function api(path, opts, retries) {
+  if (typeof location !== 'undefined' && /^[0-9a-f-]{36}\.starhermit\.com$/i.test(location.hostname)) {
+    return { ok: false, error: 'offline' };
+  }
   const headers = { 'Content-Type': 'application/json' };
   if (launchToken) headers.Authorization = 'Bearer ' + launchToken;
   const attempts = (retries == null ? 1 : retries) + 1;
