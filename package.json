@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "build": "esbuild src/main.js --bundle --outfile=lib/bundle.js --format=esm --minify --legal-comments=none",
-    "test": "npm run build && node --test test/*.test.js"
+    "test": "npm run build && node --test tests/*.test.js"
   },
   "keywords": [],
   "author": "",
