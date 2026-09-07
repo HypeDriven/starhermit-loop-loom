@@ -330,7 +330,7 @@ function stepTweens(dt) {
 // Skip/fast-forward: settle every object into the exact deterministic end state.
 export function settle() {
   tweens.length = 0;
-  if (currentState) syncLoops(currentState, false);
+  if (ready() && currentState) syncLoops(currentState, false);
 }
 
 // ---------------------------------------------------------------------------
@@ -412,11 +412,18 @@ function applyTheme(th) {
   scene.add(buildEnvironment());
 }
 
-export function setTheme(themeId) { applyTheme(getTheme(themeId)); }
+// True once init() built a live WebGL scene. When WebGL is unavailable the
+// public API becomes inert so the accessible DOM board stays fully playable.
+function ready() { return !!(renderer && scene && camera); }
+
+export function setTheme(themeId) {
+  theme = getTheme(themeId);
+  if (ready()) applyTheme(theme);
+}
 
 export function setPalette(palId) {
   palette = PALETTES[palId] || PALETTES.default;
-  if (currentState) {
+  if (ready() && currentState) {
     for (const rec of loopPool) rec.colorIdx = -1; // force rebuild
     syncLoops(currentState, false);
   }
@@ -437,12 +444,15 @@ export function setQuality(tier) {
     setQuality(mem >= 4 ? 'high' : 'medium');
     return;
   }
+  if (!ready()) return;
   renderer.setPixelRatio(quality.pixelRatio);
   renderer.shadowMap.enabled = quality.shadows;
   resize();
 }
 
 export function setBoard(state) {
+  currentState = state;
+  if (!ready()) return;
   if (!boardGroup || pegTargets.length !== state.pegs.length ||
       (loopPool.length && loopPool[loopPool.length - 1].level + 1 !== state.cap)) {
     buildBoard(state);
@@ -453,6 +463,7 @@ export function setBoard(state) {
 
 export function setSelection(sel) {
   selection = sel; // { peg, size } | null
+  if (!ready()) return;
   if (selectRing) {
     selectRing.visible = !!sel;
     if (sel) selectRing.position.x = pegX(sel.peg, currentState.pegs.length);
@@ -491,13 +502,13 @@ export function invalidFeedback(pegIdx) {
 export function onEvent(cb) { onPegEvent = cb; }
 
 export function dropEffect(pegIdx) {
-  if (!currentState) return;
+  if (!ready() || !currentState) return;
   const p = currentState.pegs[pegIdx];
   spawnParticles(pegX(pegIdx, currentState.pegs.length), 0.4 + p.length * LOOP_SPACING, 0, 12, 0.8);
 }
 
 export function winEffect() {
-  if (!currentState) return;
+  if (!ready() || !currentState) return;
   const n = currentState.pegs.length;
   for (let i = 0; i < n; i++) spawnParticles(pegX(i, n), 1.4, 0, 60, 2.2);
   if (!reducedMotion) shakeAmp = 0.12;
@@ -519,6 +530,7 @@ export function pointerToPeg(clientX, clientY) {
 export function setPointerParallax(x, y) { pointerPar.x = x; pointerPar.y = y; }
 
 export function resetCamera() {
+  if (!camera) return;
   camera.position.set(0, FRAMING.height, FRAMING.dist);
   camera.lookAt(0, FRAMING.lookY, 0);
 }

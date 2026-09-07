@@ -63,13 +63,19 @@ let presence = {};
 // Rate limiting (naive per-IP token bucket) — recoverable, never punitive
 // ---------------------------------------------------------------------------
 
+// Static asset loads are bursty (one page load fetches the bundle, icons and a
+// dozen sfx clips), so they get their own generous bucket; API calls keep the
+// tighter budget.
+const LIMITS = { api: { burst: 40, refill: 4 }, static: { burst: 240, refill: 30 } };
 const buckets = new Map();
-function rateLimited(ip) {
+function rateLimited(ip, kind) {
+  const cfg = LIMITS[kind] || LIMITS.api;
+  const key = kind + '|' + ip;
   const now = Date.now();
-  const b = buckets.get(ip) || { tokens: 40, at: now };
-  b.tokens = Math.min(40, b.tokens + (now - b.at) / 1000 * 4);
+  const b = buckets.get(key) || { tokens: cfg.burst, at: now };
+  b.tokens = Math.min(cfg.burst, b.tokens + (now - b.at) / 1000 * cfg.refill);
   b.at = now;
-  buckets.set(ip, b);
+  buckets.set(key, b);
   if (b.tokens < 1) return true;
   b.tokens -= 1;
   return false;
@@ -170,10 +176,11 @@ async function handleApi(req, res, urlPath, query) {
     const v = validateReplay(env, record);
     if (!v.ok) return sendError(res, 422, 'replay-invalid:' + v.error);
     // Plausibility/rate checks on top of replay validation.
+    // Move/invalid counts come from the replay, never from the client claim.
     const r = env.result || {};
-    if (r.moves < record.par) return sendError(res, 422, 'impossible-score');
+    if (v.moves < record.par) return sendError(res, 422, 'impossible-score');
     const entry = {
-      score: v.score, moves: r.moves | 0, invalid: r.invalid | 0,
+      score: v.score, moves: v.moves | 0, invalid: v.invalid | 0,
       elapsedMs: Math.max(0, r.elapsedMs | 0), sessionId: String(r.sessionId || 'anon').slice(0, 64),
       contentId: record.id, seed: record.seed, version: record.version,
       day: record.day == null ? null : record.day, at: Date.now(),
@@ -236,11 +243,12 @@ async function handleApi(req, res, urlPath, query) {
 const server = http.createServer(async (req, res) => {
   try {
     const ip = req.socket.remoteAddress || 'unknown';
-    if (rateLimited(ip)) return sendError(res, 429, 'rate-limited');
     let urlPath;
     try { urlPath = decodeURIComponent(req.url.split('?')[0]); } catch { urlPath = req.url.split('?')[0]; }
+    const isApi = urlPath.startsWith('/api/');
+    if (rateLimited(ip, isApi ? 'api' : 'static')) return sendError(res, 429, 'rate-limited');
     const query = new URL(req.url, 'http://localhost').searchParams;
-    if (urlPath.startsWith('/api/')) return await handleApi(req, res, urlPath, query);
+    if (isApi) return await handleApi(req, res, urlPath, query);
     if (req.method !== 'GET' && req.method !== 'HEAD') return sendError(res, 405, 'method-not-allowed');
     if (urlPath === '/') urlPath = '/index.html';
     if (!isServicable(urlPath)) return sendError(res, 403, 'forbidden');
@@ -260,10 +268,12 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// Presence pruning.
+// Presence + rate-bucket pruning (idle buckets are already fully refilled).
 setInterval(() => {
-  const cutoff = Date.now() - 120000;
+  const now = Date.now();
+  const cutoff = now - 120000;
   for (const k of Object.keys(presence)) if (presence[k] < cutoff) delete presence[k];
+  for (const [k, b] of buckets) if (b.at < cutoff) buckets.delete(k);
 }, 60000).unref();
 
 if (process.env.LL_NO_LISTEN !== '1') {

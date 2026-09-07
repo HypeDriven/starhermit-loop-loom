@@ -483,6 +483,11 @@ function boardDescription() {
 // DOM mirror of the canvas: one real button per peg, glyph-coded stacks.
 function updateA11yBoard() {
   const wrap = $('a11y-board');
+  // Rebuilding the mirror drops DOM focus; remember where it was so keyboard
+  // and screen-reader users stay on the peg they were operating.
+  const active = document.activeElement;
+  const focusedPeg = active && active.parentNode === wrap ?
+    Array.prototype.indexOf.call(wrap.children, active) : -1;
   wrap.innerHTML = '';
   if (!current) return;
   const st = current.state;
@@ -498,9 +503,10 @@ function updateA11yBoard() {
     b.innerHTML = p.length ?
       p.slice().reverse().map((c) => `<span class="glyph" style="color:${content.PALETTES[settings.palette][c]}">${content.COLOR_GLYPHS[c]}</span>`).join('') :
       '<span class="glyph">·</span>';
-    b.addEventListener('click', () => onPegChosen(i));
+    b.addEventListener('click', () => { kbFocusPeg = i; onPegChosen(i); });
     wrap.appendChild(b);
   });
+  if (focusedPeg >= 0 && wrap.children[focusedPeg]) wrap.children[focusedPeg].focus();
 }
 
 // ---------------------------------------------------------------------------
@@ -536,7 +542,8 @@ function onPegChosen(i) {
   }
   const r = current.applyCommand({ id: nextCmdId(), type: 'move', from: selectedPeg, to: i });
   if (!r.ok) {
-    feedbackInvalid(i, r.reason);
+    // applyCommand already tallied the rejected attempt; don't count it twice.
+    feedbackInvalid(i, r.reason, true);
     return;
   }
   selectedPeg = null;
@@ -573,9 +580,8 @@ function onPegChosen(i) {
   if (current.status !== 'active') endRound(current.state.terminal || 'solved');
 }
 
-function feedbackInvalid(peg, reason) {
-  current.applyCommand({ id: nextCmdId(), type: 'invalid' }); // no-op guard
-  current.state = rules.applyInvalid(current.state);
+function feedbackInvalid(peg, reason, alreadyCounted) {
+  if (!alreadyCounted) current.applyCommand({ id: nextCmdId(), type: 'invalid' });
   render.invalidFeedback(peg);
   audio.playEvent('invalid');
   if (settings.haptics && navigator.vibrate) navigator.vibrate([30, 40, 30]);
@@ -663,6 +669,16 @@ function bindKeyboard() {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) return;
     const inGame = appState === 'active' || appState === 'tutorial';
     if (e.code === b.pause || (e.code === 'Escape' && appState === 'active')) { e.preventDefault(); togglePause(); return; }
+    // Escape backs out of the open overlay rather than doing nothing.
+    if (e.code === 'Escape' && !inGame) {
+      const open = SCREENS.find((s) => {
+        const el = document.querySelector(`[data-screen="${s}"]`);
+        return el && !el.classList.contains('hidden');
+      });
+      const close = { help: () => setScreen(helpReturn), settings: () => setScreen(appState === 'paused' ? 'pause' : 'title'), modes: () => leaveToTitle(), setup: () => leaveToTitle(), compat: () => setScreen(current ? 'play' : 'title') }[open];
+      if (close) { e.preventDefault(); audio.playEvent('click'); close(); }
+      return;
+    }
     if (!inGame) return;
     const n = current ? current.state.pegs.length : 0;
     if (e.code === b.left) { kbFocusPeg = (kbFocusPeg - 1 + n) % n; updateA11yBoard(); e.preventDefault(); }
@@ -735,7 +751,6 @@ function bindLifecycle() {
       restartRenderer();
       // "While you were away" summary.
       if (current && appState === 'paused') {
-        const away = current.snapshot();
         toast('Welcome back — the atelier kept your place.');
         session.saveSnapshot(current);
       }
@@ -787,9 +802,9 @@ function wireButtons() {
   click('mode-practice', () => openSetup('practice', content.getPractice(settings.difficulty, Date.now() % 100000)));
   click('mode-challenge', () => openSetup('challenge', content.getChallenge(0, Date.now() % 100000)));
   click('mode-chase', () => openSetup('chase', content.getScoreChase(Date.now() % 1000)));
-  click('mode-back', () => setScreen('title'));
+  click('mode-back', leaveToTitle);
   click('btn-start-round', () => startRound(pendingRecord, pendingMode));
-  click('btn-back-title', () => setScreen('title'));
+  click('btn-back-title', leaveToTitle);
   click('btn-pause', togglePause);
   click('btn-resume', togglePause);
   click('btn-leave', () => { session.saveSnapshot(current); current = null; transition('title', 'user left'); setScreen('title'); refreshTitle(); });
@@ -798,7 +813,7 @@ function wireButtons() {
   click('btn-help-pause', () => showHelp('pause'));
   click('btn-help-close', () => setScreen(helpReturn));
   click('btn-retry', () => { if (!current) return; session.track('retry'); startRound(current.record, current.mode); });
-  click('btn-results-title', () => { transition('title', 'results closed'); setScreen('title'); refreshTitle(); });
+  click('btn-results-title', leaveToTitle);
   click('btn-undo', doUndo);
   click('btn-hint', doHint);
   click('tray-undo', doUndo);
@@ -810,6 +825,13 @@ function wireButtons() {
   click('btn-settle', () => render.settle());
   click('btn-replay-tutorial', () => { setScreen('title'); openSetup('learn', content.getLesson(0)); });
   click('btn-compat-close', () => { setScreen(current ? 'play' : 'title'); });
+}
+
+// Leaving a setup/menu screen returns to a freshly refreshed title screen.
+function leaveToTitle() {
+  transition('title', 'returned to title');
+  setScreen('title');
+  refreshTitle();
 }
 
 function resumeRound() {
@@ -842,7 +864,6 @@ async function boot() {
     document.body.dataset.render3d = '1';
   } catch (err) {
     render3d = false;
-    setScreen('compat');
   }
   render.onEvent((name) => audio.playEvent(name));
   audio.configure(settings);
@@ -868,7 +889,9 @@ async function boot() {
   refreshProgressRail();
   refreshTitle();
   transition('title', 'boot complete');
-  setScreen('title');
+  // A failed WebGL context is reported once boot has finished, otherwise the
+  // title screen would immediately replace the notice.
+  setScreen(render3d ? 'title' : 'compat');
   // Returning player: snapshot is offered one level below Play.
 }
 

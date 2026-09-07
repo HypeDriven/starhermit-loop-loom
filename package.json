@@ -6,14 +6,18 @@
   "main": "server.js",
   "scripts": {
     "build": "esbuild src/main.js --bundle --outfile=lib/bundle.js --format=esm --minify --legal-comments=none",
-    "test": "npm run build && node --test tests/*.test.js"
+    "test": "npm run build && node --test tests/*.test.js",
+    "test:e2e": "node tests/e2e.mjs"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "dependencies": {
     "@types/three": "^0.185.4",
     "esbuild": "^0.28.2",
     "three": "^0.169.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.62.1"
   }
 }

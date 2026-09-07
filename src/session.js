@@ -135,12 +135,19 @@ export class Session {
     if (!cmd || typeof cmd.id !== 'string') return { ok: false, reason: 'bad-command' };
     if (this.seenCmdIds.has(cmd.id)) return { ok: true, duplicate: true, state: this.state };
     if (this.state.status !== 'active') return { ok: false, reason: 'round-over' };
+    if (cmd.type === 'invalid') {
+      this.seenCmdIds.add(cmd.id);
+      this.state = rules.applyInvalid(this.state);
+      this.commands.push({ id: cmd.id, type: 'invalid' });
+      this.hashTrail.push(rules.hashState(this.state));
+      return { ok: true, state: this.state };
+    }
     if (cmd.type === 'move') {
       const from = cmd.from | 0, to = cmd.to | 0;
       const before = this.state;
       const r = rules.applyMove(before, from, to);
       if (!r.ok) {
-        this.state = r.state; // counts the invalid attempt
+        this.applyCommand({ id: cmd.id, type: 'invalid' }); // persist the penalty in the replay
         return { ok: false, reason: r.reason, state: this.state };
       }
       this.seenCmdIds.add(cmd.id);
@@ -222,6 +229,8 @@ export class Session {
 // identical hashes and result. Used by tests and the authoritative server.
 export function validateReplay(envelope, record) {
   if (!envelope || envelope.schema !== 1) return { ok: false, error: 'bad-envelope' };
+  if (!Array.isArray(envelope.commands)) return { ok: false, error: 'bad-commands' };
+  if (!Array.isArray(envelope.hashes) || envelope.hashes.length === 0) return { ok: false, error: 'bad-hashes' };
   if (!record || record.seed !== envelope.seed) return { ok: false, error: 'seed-mismatch' };
   const s = new Session(record, { mode: envelope.result ? envelope.result.mode : 'replay' });
   if (rules.hashState(s.state) !== envelope.initialHash) return { ok: false, error: 'initial-hash' };
@@ -235,7 +244,7 @@ export function validateReplay(envelope, record) {
   const mine = rules.scoreComponents(s.state, record.par, s.elapsedMs());
   const theirs = envelope.result || {};
   if ((theirs.total | 0) !== mine.total) return { ok: false, error: 'score-mismatch', expected: mine.total };
-  return { ok: true, score: mine.total };
+  return { ok: true, score: mine.total, moves: s.state.moves, invalid: s.state.invalid };
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +315,9 @@ export function checkAchievements(progress, session) {
     if (session.mode === 'journey') {
       const idx = parseInt(session.record.id.split('-')[1], 10) - 1;
       progress.journeyDone[session.record.id] = true;
-      progress.journeyUnlocked = Math.max(progress.journeyUnlocked, Math.min(idx + 2, 48));
+      // Unlock exactly the next stage (indices are 0-based; 48 authored stages),
+      // so "Play" resumes at the stage after the one just cleared.
+      progress.journeyUnlocked = Math.max(progress.journeyUnlocked, Math.min(idx + 1, 47));
       if ((session.record.difficulty || 0) >= 8) grant('milestone_hard');
     }
     if (session.mode === 'learn') {
