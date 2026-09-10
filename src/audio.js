@@ -29,6 +29,9 @@ const SFX_BY_EVENT = {
   'undo': ['move-undone'],
   'hint': ['hint-chime'],
   'click': ['ui-click'],
+  'back': ['ui-back'],
+  'round-start': ['round-start'],
+  'time-warning': ['time-warning'],
   'achievement': ['achievement-unlock'],
 };
 const sfxCache = new Map(); // name -> AudioBuffer | 'loading' | null (failed)
@@ -157,6 +160,9 @@ export function playEvent(name) {
       case 'undo': blip('effects', 340, 0.12, 'triangle', 0.1, 120); break;
       case 'hint': blip('voice', 740, 0.14, 'sine', 0.12, 60); break;
       case 'click': blip('effects', 880, 0.05, 'sine', 0.07); break;
+      case 'back': blip('effects', 420, 0.07, 'sine', 0.07, -60); break;
+      case 'round-start': noiseTick('effects', 0.35, 0.12, 1400); blip('effects', 196 * v, 0.5, 'sine', 0.08, 40); break;
+      case 'time-warning': [0, 180].forEach((d) => setTimeout(() => blip('effects', 494, 0.1, 'triangle', 0.12), d)); break;
       case 'achievement': [784, 988].forEach((f, i) => setTimeout(() => blip('voice', f, 0.3, 'sine', 0.14), i * 140)); break;
       default: blip('effects', 440, 0.08, 'sine', 0.08);
       }
@@ -171,6 +177,7 @@ function captionFor(name) {
     invalid: 'That move is not allowed', 'complete-peg': 'Peg completed',
     win: 'Loom complete', lose: 'Round over', undo: 'Move undone',
     hint: 'Hint suggested', achievement: 'Achievement unlocked',
+    back: 'Back', 'round-start': 'Round started', 'time-warning': 'Time running out',
   }[name] || '';
 }
 

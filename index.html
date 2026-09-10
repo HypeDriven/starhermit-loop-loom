@@ -26,6 +26,23 @@
   body.high-contrast { --bg:#000; --panel:#000; --panel2:#111; --text:#fff; --dim:#ddd; --accent:#ffd700; --btn:#005fcc; }
 
   #app { position: fixed; inset: 0; }
+  /* Menu backdrop: the atelier key art sits behind the overlays and fades out
+     once a round is on screen so the playfield is never obscured. */
+  #backdrop {
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: #17130f url("./assets/atelier-backdrop.webp") center/cover no-repeat;
+    transition: opacity .35s ease;
+  }
+  #backdrop::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 45%, rgba(10,8,6,.38) 0%, rgba(10,8,6,.72) 65%, rgba(10,8,6,.90) 100%);
+  }
+  body[data-appstate="active"] #backdrop,
+  body[data-appstate="tutorial"] #backdrop,
+  body[data-appstate="paused"] #backdrop,
+  body[data-appstate="resolving"] #backdrop,
+  body[data-appstate="results"] #backdrop { opacity: 0; }
+  body.high-contrast #backdrop { display: none; }
   canvas#game-canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
 
   button, .btn {
@@ -119,7 +136,7 @@
 
   #live-region { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   #caption-line {
-    position: absolute; bottom: calc(120px + var(--safe-bottom)); left: 50%; transform: translateX(-50%);
+    position: absolute; bottom: calc(140px + var(--safe-bottom)); left: 50%; transform: translateX(-50%);
     background: rgba(0,0,0,.75); border-radius: 8px; padding: 4px 14px; font-size: 14px; z-index: 4;
   }
   #toast {
@@ -152,6 +169,7 @@
 <body>
 <div id="app">
   <canvas id="game-canvas" aria-label="Loop Loom playfield" role="img"></canvas>
+  <div id="backdrop" aria-hidden="true"></div>
 
   <!-- Play HUD: objective, progress, state, pause -->
   <div id="hud" class="hidden">

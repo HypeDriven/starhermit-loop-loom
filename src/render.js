@@ -47,6 +47,28 @@ const PEG_H = 2.6;
 
 const tmpV = new THREE.Vector3();
 
+// Woven linen scan (assets/linen-weave.webp) applied to the table and mat.
+// Loaded once, lazily; if the fetch or decode fails the flat theme colors
+// simply stay in place, so the scene never depends on the asset.
+let weaveTexture = null;
+let weaveRequested = false;
+const weaveWaiters = [];
+function requestWeave(cb) {
+  if (weaveTexture) { cb(weaveTexture); return; }
+  weaveWaiters.push(cb);
+  if (weaveRequested) return;
+  weaveRequested = true;
+  try {
+    new THREE.TextureLoader().load('assets/linen-weave.webp', (tex) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 4;
+      weaveTexture = tex;
+      while (weaveWaiters.length) weaveWaiters.pop()(tex);
+    }, undefined, () => { weaveWaiters.length = 0; });
+  } catch { weaveWaiters.length = 0; }
+}
+
 function pegX(i, count) {
   const spacing = count > 6 ? 1.05 : 1.3;
   return (i - (count - 1) / 2) * spacing;
@@ -67,6 +89,13 @@ function buildEnvironment() {
   table.position.y = -0.25;
   table.receiveShadow = true;
   env.add(table);
+  requestWeave((tex) => {
+    const t = tex.clone();
+    t.needsUpdate = true;
+    t.repeat.set(8, 5);
+    table.material.map = t;
+    table.material.needsUpdate = true;
+  });
 
   // Woven mat under the pegs.
   const mat = new THREE.Mesh(
@@ -75,6 +104,13 @@ function buildEnvironment() {
   mat.position.y = 0.04;
   mat.receiveShadow = true;
   env.add(mat);
+  requestWeave((tex) => {
+    const t = tex.clone();
+    t.needsUpdate = true;
+    t.repeat.set(3, 3);
+    mat.material.map = t;
+    mat.material.needsUpdate = true;
+  });
 
   // Background spools and shelf props (procedural, decorative).
   for (let i = 0; i < 7; i++) {

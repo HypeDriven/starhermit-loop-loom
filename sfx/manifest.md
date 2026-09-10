@@ -1,6 +1,7 @@
 # SFX manifest — loop-loom
 
 Generated with MOSS-SoundEffect v2.0, 48 kHz mono Opus (96 kbps VBR, loudness-normalized; 100 inference steps).
+The canonical machine-readable list is `sfx/manifest.txt` (file | event id | description | usage context).
 
 | file | event | prompt |
 |---|---|---|
@@ -15,4 +16,7 @@ Generated with MOSS-SoundEffect v2.0, 48 kHz mono Opus (96 kbps VBR, loudness-no
 | move-undone.opus | undo | A quick reverse whoosh of fabric being pulled backward with a soft upward metallic flick, like a thread being unwound from a spool. |
 | hint-chime.opus | hint | A single soft glass ping with a gentle shimmering tail, like a fingertip tapped on a small crystal glass, friendly and unobtrusive. |
 | ui-click.opus | click | A short crisp wooden toggle click, like a small loom shuttle switch being flipped, very brief and dry. |
+| ui-back.opus | back | A short soft downward wooden tock, like a small loom lever released back to rest: brief muted knock with a faint low woody body, quieter and lower than a forward click. |
+| round-start.opus | round-start | A wooden loom shuttle sweeping once across warp threads to begin work: soft airy wooden swish with a faint low string hum and a single gentle wooden clack at the end, warm and dry. |
+| time-warning.opus | time-warning | Two gentle urgent taps on a small hollow wooden block with a faint rising tension hum underneath, like a weaver tapping to warn the thread is running short, calm but insistent, no harshness. |
 | achievement-unlock.opus | achievement | A small two-bell fanfare with a bright metallic sparkle and a soft felt mallet hit, like a tiny award ribbon being pinned, warm and rewarding. |

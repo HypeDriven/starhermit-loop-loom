@@ -32,6 +32,7 @@ let dailyExcluded = false;   // defective daily days are excluded from ranking
 let render3d = true;
 let speedTimer = null;
 let journeyPick = 0;
+let warnedLowTime = false;
 let cmdCounter = 0;
 
 const REASONS = {
@@ -107,6 +108,10 @@ function setScreen(name) {
   const inGame = name === 'play';
   $('hud').classList.toggle('hidden', !inGame);
   $('action-tray').classList.toggle('hidden', !inGame);
+  // The rails only carry round context, so they stay out of the menu screens
+  // instead of showing empty headings behind the title overlay.
+  $('rail-left').classList.toggle('hidden', !inGame);
+  $('rail-right').classList.toggle('hidden', !inGame);
   $('a11y-board').classList.toggle('hidden', !inGame && appState !== 'active');
   // Focus management: restore after modals, move into new overlay.
   const overlay = document.querySelector(`[data-screen="${name}"]`);
@@ -301,6 +306,7 @@ function startRound(record, mode) {
   session.saveSnapshot(current);
   if (record.timeTargetMs && !settings.timingAssist) {
     clearInterval(speedTimer);
+    warnedLowTime = false;
     speedTimer = setInterval(() => {
       if (!current || current.status !== 'active') { clearInterval(speedTimer); return; }
       if (current.elapsedMs() > record.timeTargetMs) {
@@ -308,9 +314,19 @@ function startRound(record, mode) {
         current.state.status = 'lost';
         current.state.terminal = 'time-limit';
         endRound('time-limit');
-      } else updateHud();
+      } else {
+        // One warning cue as the shuttle timer enters its last ten seconds.
+        const left = record.timeTargetMs - current.elapsedMs();
+        if (!warnedLowTime && left <= 10000) {
+          warnedLowTime = true;
+          audio.playEvent('time-warning');
+          toast('Ten seconds left.');
+        }
+        updateHud();
+      }
     }, 250);
   }
+  audio.playEvent('round-start');
   transition(record.tutorial ? 'tutorial' : 'active', 'round started');
   setScreen('play');
   if (record.tutorial) showTutorialStep();
@@ -676,7 +692,7 @@ function bindKeyboard() {
         return el && !el.classList.contains('hidden');
       });
       const close = { help: () => setScreen(helpReturn), settings: () => setScreen(appState === 'paused' ? 'pause' : 'title'), modes: () => leaveToTitle(), setup: () => leaveToTitle(), compat: () => setScreen(current ? 'play' : 'title') }[open];
-      if (close) { e.preventDefault(); audio.playEvent('click'); close(); }
+      if (close) { e.preventDefault(); audio.playEvent('back'); close(); }
       return;
     }
     if (!inGame) return;
@@ -787,6 +803,8 @@ function restartRenderer() {
 
 function wireButtons() {
   const click = (id, fn) => $(id).addEventListener('click', () => { audio.unlock(); audio.playEvent('click'); fn(); });
+  // Backing out of a screen gets its own lower, softer cue than a forward press.
+  const clickBack = (id, fn) => $(id).addEventListener('click', () => { audio.unlock(); audio.playEvent('back'); fn(); });
   click('btn-play', () => {
     // Short path to play: resume or straight into practice/journey in ≤2 actions.
     const saved = session.loadSnapshot();
@@ -802,18 +820,18 @@ function wireButtons() {
   click('mode-practice', () => openSetup('practice', content.getPractice(settings.difficulty, Date.now() % 100000)));
   click('mode-challenge', () => openSetup('challenge', content.getChallenge(0, Date.now() % 100000)));
   click('mode-chase', () => openSetup('chase', content.getScoreChase(Date.now() % 1000)));
-  click('mode-back', leaveToTitle);
+  clickBack('mode-back', leaveToTitle);
   click('btn-start-round', () => startRound(pendingRecord, pendingMode));
-  click('btn-back-title', leaveToTitle);
+  clickBack('btn-back-title', leaveToTitle);
   click('btn-pause', togglePause);
   click('btn-resume', togglePause);
-  click('btn-leave', () => { session.saveSnapshot(current); current = null; transition('title', 'user left'); setScreen('title'); refreshTitle(); });
+  clickBack('btn-leave', () => { session.saveSnapshot(current); current = null; transition('title', 'user left'); setScreen('title'); refreshTitle(); });
   click('btn-open-settings', () => setScreen('settings'));
-  click('btn-settings-close', () => setScreen(appState === 'paused' ? 'pause' : 'title'));
+  clickBack('btn-settings-close', () => setScreen(appState === 'paused' ? 'pause' : 'title'));
   click('btn-help-pause', () => showHelp('pause'));
-  click('btn-help-close', () => setScreen(helpReturn));
+  clickBack('btn-help-close', () => setScreen(helpReturn));
   click('btn-retry', () => { if (!current) return; session.track('retry'); startRound(current.record, current.mode); });
-  click('btn-results-title', leaveToTitle);
+  clickBack('btn-results-title', leaveToTitle);
   click('btn-undo', doUndo);
   click('btn-hint', doHint);
   click('tray-undo', doUndo);
@@ -824,7 +842,7 @@ function wireButtons() {
   click('btn-restart', () => { if (current) startRound(current.record, current.mode); });
   click('btn-settle', () => render.settle());
   click('btn-replay-tutorial', () => { setScreen('title'); openSetup('learn', content.getLesson(0)); });
-  click('btn-compat-close', () => { setScreen(current ? 'play' : 'title'); });
+  clickBack('btn-compat-close', () => { setScreen(current ? 'play' : 'title'); });
 }
 
 // Leaving a setup/menu screen returns to a freshly refreshed title screen.

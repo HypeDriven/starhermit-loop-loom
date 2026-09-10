@@ -1,0 +1,23 @@
+# Loop Loom — canonical SFX manifest
+# Format: file | event id | description of the sound | usage context
+# Event ids are the keys of SFX_BY_EVENT in src/audio.js; audio.playEvent(id)
+# prefers the clip and falls back to procedural synthesis if it is unavailable.
+# All clips: MOSS-SoundEffect v2.0, 48 kHz mono Opus 96 kbps VBR, loudness-normalised
+# to -20 LUFS, 100 inference steps. Every clip plays on the "effects" bus except
+# hint-chime and achievement-unlock, which play on "voice".
+
+loop-lift.opus         | select        | A soft woven fabric loop lifted off a brass peg: gentle cloth rustle ending in a light metallic tick, close-miked, dry. | Player lifts the top same-colour group off a peg (tap, drag start, Enter, or gamepad south button).
+loop-lower.opus        | deselect      | A soft fabric loop settling back down onto a wooden peg: muted cloth flop with a faint woody knock, quiet and dry. | Player cancels a lift by re-selecting the source peg, pressing Escape, or the gamepad east button.
+loop-place.opus        | move          | A yarn loop dropped onto a brass peg: soft fabric thud followed by a short delicate metal ring. | A legal move commits; alternates seeded-randomly with loop-settle.opus so repeated moves never sound identical.
+loop-settle.opus       | move          | Alternate take: gentler cotton whump with a low brass ping, slightly softer than a firm placement. | Second variant of the same commit event, chosen from the seeded audiovisual RNG.
+move-denied.opus       | invalid       | A dull muted double knock on a wooden loom frame: two short low thuds, no ringing, dry and flat. | A drop is rejected (colour mismatch, full peg, empty source); pairs with the on-screen reason toast and the peg shake.
+peg-complete.opus      | complete-peg  | A bright small bell chime with a sparkle of glass beads: cheerful ascending shimmer, one clean hit with a short tail. | A peg first becomes uniform; raised by render.js syncLoops when a peg enters the uniform set.
+loom-finished.opus     | win           | A short triumphant bell arpeggio rising through four notes with glockenspiel shimmer and a fabric swish underneath. | The board is solved and the results screen opens.
+round-over.opus        | lose          | A soft descending two-note sigh on a muted wooden marimba with a faint cloth rustle, calm, no harshness. | The round ends unsolved on a move limit or a speed-challenge timeout.
+move-undone.opus       | undo          | A quick reverse whoosh of fabric pulled backward with a soft upward metallic flick, like thread unwinding. | An undo command pops the snapshot stack (Practice/Journey/Learn; disabled in the No Takebacks challenge).
+hint-chime.opus        | hint          | A single soft glass ping with a gentle shimmering tail, friendly and unobtrusive. | The hint button or H key highlights a suggested move; plays on the "voice" bus so it survives a low effects mix.
+ui-click.opus          | click         | A short crisp wooden toggle click, like a small loom shuttle switch being flipped, very brief and dry. | Any forward menu press: Play, mode buttons, Start round, Retry, tray buttons.
+ui-back.opus           | back          | A short soft downward wooden tock, like a small loom lever released back to rest: lower and quieter than the forward click. | Backing out of a screen: Back, Done, Close, Leave to title, Continue in 2D, and the Escape key closing an overlay.
+round-start.opus       | round-start   | A wooden loom shuttle sweeping once across warp threads: airy wooden swish with a faint low string hum and a single gentle clack. | Fires once as a round begins, immediately before the play screen appears.
+time-warning.opus      | time-warning  | Two gentle urgent taps on a hollow wooden block over a faint rising tension hum, insistent but never harsh. | Fires once in the Swift Shuttle speed challenge when ten seconds remain; accompanied by a "Ten seconds left." toast.
+achievement-unlock.opus| achievement   | A small two-bell fanfare with bright metallic sparkle and a soft felt mallet hit, warm and rewarding. | An achievement is granted at the end of a round; plays on the "voice" bus, once per newly unlocked id.
