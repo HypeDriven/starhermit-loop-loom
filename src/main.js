@@ -856,6 +856,7 @@ function wireButtons() {
   click('btn-hint', doHint);
   click('tray-undo', doUndo);
   click('tray-hint', doHint);
+  click('tray-camera', () => render.resetCamera());
   click('tray-help', () => showHelp('play'));
   click('tray-panel', () => $('rail-right').classList.toggle('drawer-open'));
   click('btn-drawer-left', () => $('rail-left').classList.toggle('drawer-open'));

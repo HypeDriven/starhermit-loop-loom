@@ -41,6 +41,8 @@ let lastUniformPegs = new Set();
 
 // Framing constants (authored, not magic offsets).
 const FRAMING = { dist: 7.6, height: 4.6, lookY: 0.9, fov: 40 };
+const camBase = new THREE.Vector3(0, FRAMING.height, FRAMING.dist); // fitted per viewport (fitCamera)
+let currentPegCount = 5;
 const LOOP_SPACING = 0.34;
 const LOOP_R = 0.3, LOOP_TUBE = 0.115;
 const PEG_H = 2.6;
@@ -206,6 +208,7 @@ function buildBoard(state) {
   markers = [];
   loopPool = [];
   const count = state.pegs.length;
+  if (count !== currentPegCount) { currentPegCount = count; fitCamera(); }
   for (let i = 0; i < count; i++) {
     const peg = makePeg(pegX(i, count));
     peg.userData.pegIndex = i;
@@ -407,16 +410,18 @@ export function init(canvasEl, opts) {
     for (const m of markers) {
       if (m.userData.active) m.material.opacity = 0.35 + Math.sin(t * 4) * 0.15;
     }
-    // Camera shake (event-tiered, disabled by reduced motion; never changes raycast truth).
+    // The camera is assigned every frame from the immutable fitted base plus
+    // bounded shake and parallax offsets, so nothing accumulates between frames.
+    camera.position.copy(camBase);
     if (shakeAmp > 0.0005 && !reducedMotion) {
       camera.position.x += (decorRng() - 0.5) * shakeAmp;
       camera.position.y += (decorRng() - 0.5) * shakeAmp;
       shakeAmp *= 0.85;
     }
-    // Gentle pointer parallax (interruptible, reduced-motion aware).
     if (!reducedMotion) {
-      camera.position.x += pointerPar.x * 0.06;
-      camera.position.y += pointerPar.y * 0.04;
+      const px = Math.max(-0.5, Math.min(0.5, pointerPar.x)), py = Math.max(-0.5, Math.min(0.5, pointerPar.y));
+      camera.position.x += px * 0.6;
+      camera.position.y += py * 0.4;
     }
     camera.lookAt(0, FRAMING.lookY, 0);
     renderer.render(scene, camera);
@@ -567,8 +572,40 @@ export function setPointerParallax(x, y) { pointerPar.x = x; pointerPar.y = y; }
 
 export function resetCamera() {
   if (!camera) return;
-  camera.position.set(0, FRAMING.height, FRAMING.dist);
+  pointerPar.x = 0; pointerPar.y = 0;
+  shakeAmp = 0;
+  fitCamera();
+  camera.position.copy(camBase);
   camera.lookAt(0, FRAMING.lookY, 0);
+}
+
+// Fit the peg row (plus stack height) into the canvas minus the bottom HUD
+// band (tray + peg mirror), for any aspect ratio.
+function fitCamera() {
+  if (!camera || !canvas) return;
+  const count = currentPegCount || 5;
+  const halfW = Math.abs(pegX(0, count)) + 1.1;
+  const halfH = (PEG_H + 0.6) / 2;
+  const tanV = Math.tan((FRAMING.fov * Math.PI) / 360);
+  let bottomFrac = 0;
+  if (typeof document !== 'undefined') {
+    const H = canvas.clientHeight || 1;
+    const cr = canvas.getBoundingClientRect();
+    for (const id of ['action-tray', 'a11y-board']) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || el.offsetWidth <= 1) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width > cr.width * 0.5 || r.left < cr.left + cr.width * 0.5) bottomFrac = Math.max(bottomFrac, (cr.bottom - r.top) / H);
+    }
+  }
+  const freeH = Math.max(0.45, 1 - Math.min(0.4, bottomFrac) - 0.04);
+  const base = Math.hypot(FRAMING.dist, FRAMING.height - FRAMING.lookY);
+  const needH = halfH / (tanV * freeH);
+  const needW = halfW / (tanV * camera.aspect * 0.94);
+  const k = Math.max(1, needH / base, needW / base);
+  camBase.set(0, FRAMING.lookY + (FRAMING.height - FRAMING.lookY) * k, FRAMING.dist * k);
 }
 
 function resize() {
@@ -579,6 +616,7 @@ function resize() {
   renderer.setPixelRatio(quality.pixelRatio);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  fitCamera();
 }
 
 export function setHeartbeat(active) {

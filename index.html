@@ -156,10 +156,15 @@
   @media (max-width: 700px) and (orientation: portrait) {
     .hud-card { font-size: 12px; padding: 5px 8px; }
     #a11y-board .peg-btn { min-width: 44px; min-height: 52px; }
+    /* one tray row: the mirror sits directly above it */
+    #action-tray { flex-wrap: nowrap; gap: 6px; }
+    #action-tray button { flex: 1 1 0; min-width: 0; padding: 8px 4px; font-size: 14px; }
   }
   @media (max-height: 500px) and (orientation: landscape) {
-    #a11y-board { bottom: calc(8px + var(--safe-bottom)); left: auto; right: calc(150px + var(--safe-right)); transform: none; }
-    .rail { top: calc(52px + var(--safe-top)); bottom: calc(8px + var(--safe-bottom)); width: 200px; }
+    /* tray bottom-left, peg mirror bottom-right: separate regions, no overlap */
+    #action-tray { left: calc(10px + var(--safe-left)); right: auto; max-width: 42vw; justify-content: flex-start; }
+    #a11y-board { bottom: calc(8px + var(--safe-bottom)); left: auto; right: calc(10px + var(--safe-right)); transform: none; max-width: 54vw; }
+    .rail { top: calc(52px + var(--safe-top)); bottom: calc(76px + var(--safe-bottom)); width: 200px; }
   }
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
@@ -215,6 +220,7 @@
     <button id="tray-hint" class="secondary">Hint</button>
     <button id="tray-help" class="secondary">Help</button>
     <button id="tray-panel" class="secondary">Panel</button>
+    <button id="tray-camera" class="secondary" title="Reset view (R)">View</button>
   </div>
 
   <!-- Accessible board mirror -->
