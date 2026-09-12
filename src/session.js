@@ -297,6 +297,35 @@ export function getScores(board, day) {
 }
 
 // ---------------------------------------------------------------------------
+// Cloud-save doc: a mirror of the localStorage payloads (progress, settings,
+// scores) for the platform cloud slot. localStorage remains the offline cache.
+// ---------------------------------------------------------------------------
+
+export function exportDoc() {
+  return {
+    v: 1,
+    savedAt: Date.now(),
+    progress: lsGet(LS.progress, null),
+    settings: lsGet(LS.settings, null),
+    scores: lsGet(LS.scores, null),
+  };
+}
+
+// Remote-preferred import: a valid remote doc overwrites the local cache.
+// Returns true when at least one section was applied.
+export function importDoc(doc) {
+  if (!doc || doc.v !== 1) return false;
+  let ok = false;
+  if (doc.progress && doc.progress.version === 1 && doc.progress.data && typeof doc.progress.sum === 'number') {
+    lsSet(LS.progress, doc.progress); // loadProgress re-validates the checksum
+    ok = true;
+  }
+  if (doc.settings && typeof doc.settings === 'object') { lsSet(LS.settings, doc.settings); ok = true; }
+  if (doc.scores && Array.isArray(doc.scores.global)) { lsSet(LS.scores, doc.scores); ok = true; }
+  return ok;
+}
+
+// ---------------------------------------------------------------------------
 // Achievements — stable lowercase keys, idempotent unlocks.
 // ---------------------------------------------------------------------------
 
@@ -347,5 +376,6 @@ export function track(eventName) {
 export default {
   Session, DEFAULT_SETTINGS, loadSettings, saveSettings, ACHIEVEMENTS,
   loadProgress, saveProgress, saveSnapshot, loadSnapshot, clearSnapshot,
-  recordScore, getScores, checkAchievements, validateReplay, getSessionId, track,
+  recordScore, getScores, exportDoc, importDoc, checkAchievements,
+  validateReplay, getSessionId, track,
 };

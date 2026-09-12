@@ -146,6 +146,7 @@ function bindSettings() {
       el.addEventListener('change', () => {
         settings[key] = isRange ? parseFloat(el.value) : el.checked;
         session.saveSettings(settings);
+        platform.cloudSave(session.exportDoc());
         session.track('settings-change');
         applySettings();
       });
@@ -154,6 +155,7 @@ function bindSettings() {
       el.addEventListener('change', () => {
         settings[key] = el.value;
         session.saveSettings(settings);
+        platform.cloudSave(session.exportDoc());
         session.track('settings-change');
         applySettings();
       });
@@ -370,7 +372,10 @@ function endRound(reason) {
     version: current.record.version, day: current.record.day,
   });
   if (r.solved) session.recordScore(entry);
-  if ((current.mode === 'daily' || current.mode === 'chase') && r.solved && !dailyExcluded) {
+  platform.cloudSave(session.exportDoc());
+  // Platform leaderboards are script-owned and read-only; submission exists
+  // only against the repo's own dev server (local play).
+  if (!platform.isHosted() && (current.mode === 'daily' || current.mode === 'chase') && r.solved && !dailyExcluded) {
     platform.submitScore(current.replayEnvelope()).then((res) => {
       if (res.ok) toast('Score submitted to the global board.');
       else if (res.error !== 'offline') toast('Score rejected: ' + res.error);
@@ -451,27 +456,42 @@ function updateHud() {
   }
 }
 
+function syncLabel() {
+  return { synced: 'synced', saving: 'saving…', error: 'sync error' }[platform.getSyncStatus()] || 'offline';
+}
+
 function updateRails() {
   if (!current) return;
   $('rail-mode').textContent = `Mode: ${pendingMode} · ${current.record.title || ''}`;
-  $('rail-online').textContent = platform.isOnline() ?
-    'Connected — scores submit to the global board.' :
-    'Offline — playing locally; scores are stored on this device.';
+  $('rail-online').textContent = platform.isHosted() ?
+    `${platform.getNickname()} · cloud save ${syncLabel()}` :
+    platform.isOnline() ?
+      'Connected — scores submit to the global board.' :
+      'Offline — playing locally; scores are stored on this device.';
   $('rail-objective').textContent = current.record.challenge ? current.record.challenge.text :
     'Move loops between pegs until every peg holds one color.';
   $('rail-progress').textContent = `Par ${current.record.par} · seed ${current.record.seed.toString(16)}`;
   $('btn-undo').disabled = current.snapshots.length === 0 || !!current.record.noUndo;
   $('tray-undo').disabled = $('btn-undo').disabled;
-  // Scores
+  // Scores: hosted read-only board when available, local records otherwise.
   const list = $('rail-scores');
   list.innerHTML = '';
-  const scores = session.getScores(current.mode === 'daily' ? 'daily' : 'global', current.record.day);
-  for (const s of scores.slice(0, 8)) {
-    const li = document.createElement('li');
-    li.textContent = `${s.score} · ${s.moves} moves · ${(s.elapsedMs / 1000).toFixed(0)}s`;
-    list.appendChild(li);
+  const hosted = platform.isHosted() ? platform.getHostedBoard() : null;
+  if (hosted && hosted.length) {
+    for (const e of hosted.slice(0, 8)) {
+      const li = document.createElement('li');
+      li.textContent = `${e.score} · ${e.name}`;
+      list.appendChild(li);
+    }
+  } else {
+    const scores = session.getScores(current.mode === 'daily' ? 'daily' : 'global', current.record.day);
+    for (const s of scores.slice(0, 8)) {
+      const li = document.createElement('li');
+      li.textContent = `${s.score} · ${s.moves} moves · ${(s.elapsedMs / 1000).toFixed(0)}s`;
+      list.appendChild(li);
+    }
+    if (!scores.length) list.innerHTML = '<li>No scores yet.</li>';
   }
-  if (!scores.length) list.innerHTML = '<li>No scores yet.</li>';
   // Achievements
   const al = $('rail-achievements');
   al.innerHTML = '';
@@ -866,9 +886,11 @@ function refreshTitle() {
   const saved = session.loadSnapshot();
   $('btn-resume-saved').classList.toggle('hidden', !saved);
   const done = Object.keys(progress.journeyDone).length;
-  $('title-status').textContent =
+  const who = platform.isHosted() ? platform.getNickname() + ' · ' : '';
+  $('title-status').textContent = who +
     `Journey ${done}/${content.journeyCount} · Daily day ${serverTime.utcDay()} · ` +
-    (platform.isOnline() ? 'online' : 'offline (local play)');
+    (platform.isHosted() ? 'cloud save ' + syncLabel()
+      : platform.isOnline() ? 'online' : 'offline (local play)');
 }
 
 async function boot() {
@@ -895,6 +917,21 @@ async function boot() {
   requestAnimationFrame(pollGamepad);
   // Core data first, scenic lazily; server time + content validation.
   await platform.syncTime();
+  // Hosted: pull the account nickname and the remote save (remote wins on
+  // conflict), then the read-only leaderboard; everything degrades silently.
+  if (platform.isHosted()) {
+    await platform.fetchProfile();
+    const remote = await platform.cloudLoad();
+    if (remote && session.importDoc(remote)) {
+      settings = session.loadSettings();
+      progress = session.loadProgress();
+      applySettings();
+    }
+    platform.refreshHostedBoard().then(() => {
+      if (current) updateRails();
+      refreshTitle();
+    });
+  }
   const report = content.validateAll();
   const bad = report.filter((r) => !r.ok);
   if (bad.length) {

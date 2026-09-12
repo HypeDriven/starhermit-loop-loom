@@ -30,9 +30,9 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 | `src/session.js` | Round lifecycle, command log, undo stack, replay envelope, localStorage persistence, achievements, local boards |
 | `src/render.js` | Three.js atelier scene, pegs, loops, markers, particles, tweens, quality tiers, peg raycasting |
 | `src/audio.js` | WebAudio buses, authored clip playback with procedural fallback, ambience, adaptive music, captions |
-| `src/platform.js` | StarHermit REST adapter: launch token, activity, presence, score submit, achievements, telemetry |
+| `src/platform.js` | StarHermit adapter: fragment launch-token handshake + 45-min refresh, Bearer auth, nickname profile, cloud-save mirror (zip+base64), read-only leaderboards; hosted mode iff a fragment token was read |
 | `src/server-time.js` | Round-trip-corrected server clock and the UTC day number the Daily uses |
-| `server.js` | StarHermit game script: static host + authoritative API (time, daily, replay-validated scores, achievements, presence) |
+| `server.js` | Local-dev backend: static host + API (time, daily, replay-validated scores, achievements, presence); not exercised on-platform |
 | `tests/rules.test.js` `tests/content.test.js` `tests/session.test.js` | `node --test` unit/property/golden suites |
 | `tests/e2e.mjs` | Playwright-core playthrough of the real UI at three viewports |
 | `sfx/manifest.txt` | Canonical clip table (`file \| event id \| description \| usage`); `manifest.json` drives generation |
@@ -393,21 +393,35 @@ see §17.
 
 `starhermit.txt` declares `name`, `launch=index.html`, `owner`, `server=server.js`, `cover=coverart.png`.
 
-**Used.** Launch-token handshake (`platform.handshake()` reads `launch_token` from the query string,
-holds it in memory only — never in storage — and scrubs the URL); activity pairing (`/api/v1/activity`
-start/end, also on visibility change) so host playtime is accurate; throttled presence heartbeats
-(`/api/v1/presence`, at most every 30 s, only while moves are being made); server time
-(`/api/v1/time`, round-trip corrected) as the authority for the Daily's UTC day; leaderboards
-(`/api/v1/scores` GET/POST) for Daily and Score Chase, submitted as a replay envelope and re-validated
-server-side; achievements (`/api/v1/achievements`, idempotent per session id); anonymous aggregate
-telemetry (`/api/v1/telemetry`), sent only with explicit consent and only as counters from a six-event
-allowlist. `server.js` implements all of these, with per-IP token buckets (API 40 burst / 4 per second,
-static 240 / 30) and JSON stores under `.server-data/`.
+**Used.** Launch-token handshake: the platform delivers the token in the URL
+fragment (`#game_token=<jwt>`); `platform.handshake()` reads it once, decodes
+`sub` + `game_scope` (base64url, no verify), holds it in memory only — never in
+storage — scrubs the fragment via `history.replaceState`, and re-mints it every
+45 min (`POST /api/v1/games/{slug}/launch-token`, ~60 s retry on failure).
+`Authorization: Bearer` rides every REST call. The account nickname comes from
+`GET /api/v1/users/{sub}/profile` (never `/api/v1/me`, never usernames;
+fallback `"Player " + sub.slice(0,8)`) and is shown in the status rail and on
+the title screen. Cloud save mirrors the localStorage doc (progress, settings,
+scores) to the single slot `GET/PUT /api/v1/me/cloud-saves/{slug}` as
+zip+base64 — remote wins on conflict, saves debounce ~2 s and flush on
+pagehide, and the status rail shows synced/saving/offline. Hosted leaderboards
+are read-only: `GET /api/v1/games/{slug}` → `leaderboardId`, then
+`GET /api/v1/leaderboards/{id}/entries` with names resolved via the profile
+route; personal bests stay local and cloud-mirrored. Achievements stay local
+(part of the cloud-saved doc). Query-param tokens (`?launch_token=`, `?token=`)
+remain local-dev fallbacks against the repo's own `server.js`, which also
+serves time sync, activity start/end, throttled presence heartbeats,
+replay-validated score submission, achievements and consent-gated telemetry
+when running standalone; none of those fabricated routes are called on
+StarHermit, so hosted play produces no failed API calls.
 
-**Not used.** Real-time multiplayer, matchmaking, parties, chat, friends lists, cloud saves, entitlements
-or purchases. Loop Loom is solo; the only social surface is asynchronous score comparison. The game is
-fully playable with the whole API unreachable — every call resolves to `{ ok: false, error: 'offline' }`,
-the status rail says so, and scores fall back to the local boards.
+**Not used.** Real-time multiplayer, matchmaking, parties, chat, friends lists,
+entitlements or purchases, and client score submission to the platform-owned
+leaderboard. Loop Loom is solo; the social surfaces are the read-only hosted
+board and asynchronous personal-best comparison. The game is fully playable
+with the whole API unreachable — every call resolves to
+`{ ok: false, error: 'offline' }`, the status rail says so, and scores fall
+back to the local boards.
 
 **Anti-cheat.** `POST /api/v1/scores` never trusts a client board or score. It re-derives the record from
 `contentId`, rejects mismatched content or rules versions with 409, replays the command log through the
@@ -521,8 +535,10 @@ theme colours and the `#17130f` backdrop ground stay in place and nothing else c
 - **The gamepad path is polled, not tested end-to-end.** It is exercised by hand, not by `tests/e2e.mjs`.
 - **`holdToLift` and `timingAssist` settings persist but only `timingAssist` changes behaviour** (it
   suppresses the speed-challenge timer); tap-to-select is always the pointer model.
-- **No cloud save.** Progress lives in this browser's `localStorage`; clearing site data resets the
-  Journey.
+- **Cloud save needs a hosted launch token.** With one, progress/settings/scores
+  mirror to the platform cloud slot and the remote copy wins on conflict; offline
+  (local play) progress lives only in this browser's `localStorage`, and clearing
+  site data resets the Journey.
 
 ---
 
