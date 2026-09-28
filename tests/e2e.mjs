@@ -141,7 +141,7 @@ async function runPass(tag, contextOpts) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() !== 'error') return;
+    if (m.type() !== 'error' && m.type() !== 'warning') return;
     if (browserNoise.test(m.text())) return;
     // Expected offline behavior: platform calls to /api/* 404 against the
     // embedded static server; Chrome logs these as resource errors.
@@ -176,6 +176,49 @@ async function runPass(tag, contextOpts) {
       await page.click('#btn-modes');
       await overlay('modes').waitFor();
       await page.keyboard.press('Escape');
+      await overlay('title').waitFor();
+    });
+
+    await step('graphics settings: presets, override, persistence', async () => {
+      const preset = () => page.evaluate(() => document.body.dataset.gfxPreset);
+      await page.click('#btn-title-settings');
+      await overlay('settings').waitFor();
+      await page.locator('#gfx-section').scrollIntoViewIfNeeded();
+      await page.locator('#set-quality').waitFor({ state: 'visible' });
+      // Headless Chrome is a software GPU: Auto must resolve to Low.
+      if (await preset() !== 'low') throw new Error('Auto should detect low on a software GPU, got ' + await preset());
+      const autoLabel = await page.locator('#set-quality option[value="auto"]').innerText();
+      if (!/Auto/.test(autoLabel) || !/Low/.test(autoLabel)) throw new Error('auto label: ' + autoLabel);
+      await page.selectOption('#set-quality', 'ultra');
+      await page.waitForFunction(() => document.body.dataset.gfxPreset === 'ultra');
+      await page.waitForTimeout(700); // render a few frames with the full post chain
+      await page.selectOption('#set-quality', 'low');
+      await page.waitForFunction(() => document.body.dataset.gfxPreset === 'low' && document.getElementById('game-canvas').dataset.gfxPreset === 'low');
+      await page.selectOption('#set-quality', 'high');
+      await page.waitForFunction(() => document.body.dataset.gfxPreset === 'high');
+      const summary = await page.locator('#gfx-summary').innerText();
+      if (!/2048² shadows/.test(summary) || !/\d+×\d+ px/.test(summary)) throw new Error('summary not updated for High: ' + summary);
+      const fromLabel = await page.locator('#gfx-bloom option[value="preset"]').innerText();
+      if (!/From preset \(On\)/.test(fromLabel)) throw new Error('bloom default label: ' + fromLabel);
+      await page.selectOption('#gfx-bloom', 'off');
+      await page.locator('#gfx-fps').check();
+      await page.locator('#fps-meter').waitFor({ state: 'visible' });
+      await page.screenshot({ path: SHOT('gfx', tag) });
+      await page.waitForTimeout(400);
+      await page.reload({ waitUntil: 'load' });
+      await overlay('title').waitFor({ timeout: 15000 });
+      if (await preset() !== 'high') throw new Error('preset did not survive reload: ' + await preset());
+      await page.click('#btn-title-settings');
+      await overlay('settings').waitFor();
+      if (await page.locator('#set-quality').inputValue() !== 'high') throw new Error('preset select not restored');
+      if (await page.locator('#gfx-bloom').inputValue() !== 'off') throw new Error('bloom override not restored');
+      if (!(await page.locator('#gfx-fps').isChecked())) throw new Error('fps toggle not restored');
+      // Choosing a preset clears overrides; back to Auto keeps the rest of the run cheap.
+      await page.selectOption('#set-quality', 'auto');
+      await page.waitForFunction(() => document.body.dataset.gfxPreset === 'low');
+      if (await page.locator('#gfx-bloom').inputValue() !== 'preset') throw new Error('preset change did not clear the override');
+      await page.locator('#gfx-fps').uncheck();
+      await page.click('#btn-settings-close');
       await overlay('title').waitFor();
     });
 
@@ -351,7 +394,7 @@ let browser;
 try {
   browser = await chromium.launch({
     executablePath: '/usr/bin/google-chrome',
-    args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
+    args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
   });
   await runPass('desktop', { viewport: { width: 1280, height: 800 } });
   await runPass('mobile', { viewport: { width: 390, height: 844 }, hasTouch: true });

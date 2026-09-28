@@ -11,6 +11,8 @@ import * as render from './render.js';
 import * as audio from './audio.js';
 import * as platform from './platform.js';
 import * as serverTime from './server-time.js';
+import { CATEGORIES, PRESETS, presetTier, choosePreset } from './gfx.js';
+import { gfxStrings } from './gfx-i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -127,11 +129,21 @@ function setScreen(name) {
 // Settings
 // ---------------------------------------------------------------------------
 
+// Graphics settings live in settings.graphics; the old single quality tier
+// (auto/low/medium/high) migrates onto a preset once.
+function migrateGraphics() {
+  if (settings.graphics && typeof settings.graphics === 'object') return;
+  const map = { low: 'low', medium: 'balanced', high: 'high' };
+  settings.graphics = { preset: map[settings.quality] || 'auto' };
+}
+
 function applySettings() {
+  migrateGraphics();
   audio.configure(settings);
   render.setReducedMotion(settings.reducedMotion);
-  render.setQuality(settings.quality);
+  render.setGraphics(settings.graphics);
   render.setPalette(settings.palette);
+  document.body.classList.toggle('reduced-motion', !!settings.reducedMotion);
   document.body.classList.toggle('larger-text', settings.largerText);
   document.body.classList.toggle('high-contrast', settings.highContrast);
   document.body.classList.toggle('left-handed', settings.leftHanded);
@@ -166,7 +178,6 @@ function bindSettings() {
   bind('set-ambience', 'ambience', true);
   bind('set-voice', 'voice', true);
   bind('set-muted', 'muted');
-  bind('set-quality', 'quality');
   bind('set-motion', 'reducedMotion');
   bind('set-palette', 'palette');
   bind('set-contrast', 'highContrast');
@@ -176,6 +187,100 @@ function bindSettings() {
   bind('set-timing', 'timingAssist');
   bind('set-haptics', 'haptics');
   bind('set-telemetry', 'telemetryConsent');
+}
+
+// ---------------------------------------------------------------------------
+// Graphics panel: preset, render scale, per-category overrides, adaptive
+// resolution, frame-rate readout, GPU/cost summary. Applies live, persists
+// with the other settings.
+// ---------------------------------------------------------------------------
+
+const G = gfxStrings(typeof navigator !== 'undefined' ? (navigator.languages && navigator.languages[0]) || navigator.language : 'en-US');
+let gfxRefreshTimer = 0;
+
+function saveGraphics(next) {
+  settings.graphics = next;
+  settings.quality = next.preset || 'auto'; // legacy mirror
+  session.saveSettings(settings);
+  platform.cloudSave(session.exportDoc());
+  session.track('settings-change');
+  render.setGraphics(settings.graphics);
+  refreshGraphicsUI();
+  clearTimeout(gfxRefreshTimer);
+  gfxRefreshTimer = setTimeout(refreshGraphicsUI, 150); // pixel size settles on the next frame
+}
+
+function bindGraphics() {
+  $('gfx-heading').textContent = G.graphics;
+  $('btn-title-settings').textContent = G.settings;
+  document.querySelectorAll('#gfx-section [data-i18n]').forEach((el) => { el.textContent = G[el.dataset.i18n]; });
+  const cats = $('gfx-cats');
+  cats.textContent = '';
+  for (const [cat, tiers] of Object.entries(CATEGORIES)) {
+    const row = document.createElement('div');
+    row.className = 'settings-row';
+    const label = document.createElement('label');
+    label.htmlFor = 'gfx-' + cat;
+    label.textContent = G.cat[cat];
+    const sel = document.createElement('select');
+    sel.id = 'gfx-' + cat;
+    sel.dataset.gfxCat = cat;
+    const def = document.createElement('option');
+    def.value = 'preset';
+    sel.append(def);
+    for (const t of tiers) {
+      const o = document.createElement('option');
+      o.value = t;
+      o.textContent = G.tier[t] || t;
+      sel.append(o);
+    }
+    sel.addEventListener('change', () => {
+      const next = Object.assign({}, settings.graphics);
+      if (sel.value === 'preset') delete next[cat]; else next[cat] = sel.value;
+      saveGraphics(next);
+    });
+    row.append(label, sel);
+    cats.append(row);
+  }
+  const preset = $('set-quality');
+  for (const o of preset.options) if (o.value !== 'auto') o.textContent = G.preset[o.value];
+  preset.addEventListener('change', () => saveGraphics(choosePreset(settings.graphics, preset.value)));
+  const scale = $('gfx-scale');
+  scale.addEventListener('input', () => { $('gfx-scale-value').textContent = scale.value + '%'; });
+  scale.addEventListener('change', () => saveGraphics(Object.assign({}, settings.graphics, { render_scale: parseInt(scale.value, 10) / 100 })));
+  $('gfx-adaptive').addEventListener('change', (e) => saveGraphics(Object.assign({}, settings.graphics, { adaptive: e.target.checked })));
+  $('gfx-fps').addEventListener('change', (e) => saveGraphics(Object.assign({}, settings.graphics, { show_fps: e.target.checked })));
+  refreshGraphicsUI();
+}
+
+function refreshGraphicsUI() {
+  migrateGraphics();
+  const g = settings.graphics;
+  const info = render.graphicsInfo(G.sum);
+  const r = info.resolved;
+  const preset = $('set-quality');
+  preset.value = PRESETS.includes(g.preset) ? g.preset : 'auto';
+  preset.options[0].textContent = G.auto.replace('{tier}', G.preset[info.detected] || info.detected);
+  for (const cat of Object.keys(CATEGORIES)) {
+    const sel = $('gfx-' + cat);
+    if (!sel) continue;
+    const t = presetTier(r.preset, cat);
+    sel.options[0].textContent = G.fromPreset.replace('{tier}', G.tier[t] || t);
+    sel.value = CATEGORIES[cat].includes(g[cat]) ? g[cat] : 'preset';
+  }
+  const pct = Math.round(r.renderScale * 100);
+  $('gfx-scale').value = pct;
+  $('gfx-scale-value').textContent = pct + '%';
+  $('gfx-adaptive').checked = r.adaptive;
+  $('gfx-fps').checked = r.showFps;
+  $('gfx-summary').textContent = info.webgl ? `${info.gpu} · ${info.summary}` : info.summary;
+  const note = $('gfx-note');
+  const msg = !info.webgl ? G.noWebgl : info.postFailed ? G.postFailed : '';
+  note.textContent = msg;
+  note.classList.toggle('hidden', !msg);
+  const panel = $('gfx-section');
+  panel.dataset.gfxPreset = r.preset;
+  panel.dataset.gfxAuto = r.auto ? '1' : '0';
 }
 
 // ---------------------------------------------------------------------------
@@ -812,7 +917,7 @@ function bindLifecycle() {
 
 let rendererAlive = true;
 function restartRenderer() {
-  if (rendererAlive) return;
+  if (rendererAlive) { render.setHeartbeat(true); return; }
   rendererAlive = true;
   try { render.init($('game-canvas'), { reducedMotion: settings.reducedMotion }); applySettings(); } catch { /* keep 2D */ }
 }
@@ -846,7 +951,8 @@ function wireButtons() {
   click('btn-pause', togglePause);
   click('btn-resume', togglePause);
   clickBack('btn-leave', () => { session.saveSnapshot(current); current = null; transition('title', 'user left'); setScreen('title'); refreshTitle(); });
-  click('btn-open-settings', () => setScreen('settings'));
+  click('btn-open-settings', () => { refreshGraphicsUI(); setScreen('settings'); });
+  click('btn-title-settings', () => { refreshGraphicsUI(); setScreen('settings'); });
   clickBack('btn-settings-close', () => setScreen(appState === 'paused' ? 'pause' : 'title'));
   click('btn-help-pause', () => showHelp('pause'));
   clickBack('btn-help-close', () => setScreen(helpReturn));
@@ -911,6 +1017,7 @@ async function boot() {
   audio.bindVisibility();
   applySettings();
   bindSettings();
+  bindGraphics();
   wireButtons();
   bindPointer(canvas);
   bindKeyboard();

@@ -16,7 +16,7 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 | Players | 1, with asynchronous score comparison |
 | Session | 40 s (Learn lesson) to ~4 min (difficulty 10 Practice board); one Journey stage ≈ 1–2 min |
 | Platforms | Desktop and mobile browsers, portrait and landscape; keyboard, mouse, touch, gamepad |
-| Rendering | Three.js r169 WebGL scene, with a DOM board mirror that is fully playable when WebGL is absent |
+| Rendering | Three.js r169 WebGL scene with optional post-processing (same-revision addons, bundled from `node_modules/three`), with a DOM board mirror that is fully playable when WebGL is absent |
 | Build | `esbuild` bundles `src/main.js` → `lib/bundle.js` (ESM, minified); `index.html` loads only that bundle |
 
 ### File map
@@ -28,12 +28,14 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 | `src/rules.js` | Pure rules engine: legality, group moves, terminal states, scoring, board generation, BFS solver, hint |
 | `src/content.js` | Themes, palettes, glyphs, Journey (48 stages), Learn lessons, Daily, Practice, Challenges, Score Chase, content validation |
 | `src/session.js` | Round lifecycle, command log, undo stack, replay envelope, localStorage persistence, achievements, local boards |
-| `src/render.js` | Three.js atelier scene, pegs, loops, markers, particles, tweens, quality tiers, peg raycasting |
+| `src/render.js` | Three.js atelier scene, pegs, loops, markers, particles, dust motes, tweens, IBL, shadows, post chain, adaptive resolution, peg raycasting |
+| `src/gfx.js` | Pure graphics quality model: presets, categories, GPU detection, `resolve` / `presetTier` / `choosePreset` / `describe` |
+| `src/gfx-i18n.js` | Graphics panel strings in the nine locales and the `navigator.language` locale picker |
 | `src/audio.js` | WebAudio buses, authored clip playback with procedural fallback, ambience, adaptive music, captions |
 | `src/platform.js` | StarHermit adapter: fragment launch-token handshake + 45-min refresh, Bearer auth, nickname profile, cloud-save mirror (zip+base64), read-only leaderboards; hosted mode iff a fragment token was read |
 | `src/server-time.js` | Round-trip-corrected server clock and the UTC day number the Daily uses |
 | `server.js` | Local-dev backend: static host + API (time, daily, replay-validated scores, achievements, presence); not exercised on-platform |
-| `tests/rules.test.js` `tests/content.test.js` `tests/session.test.js` | `node --test` unit/property/golden suites |
+| `tests/rules.test.js` `tests/content.test.js` `tests/session.test.js` `tests/gfx.test.js` | `node --test` unit/property/golden/graphics-model suites |
 | `tests/e2e.mjs` | Playwright-core playthrough of the real UI at three viewports |
 | `sfx/manifest.txt` | Canonical clip table (`file \| event id \| description \| usage`); `manifest.json` drives generation |
 | `assets/` | `atelier-backdrop.webp` (menu backdrop), `linen-weave.webp` (table/mat texture) |
@@ -77,7 +79,7 @@ the log. *Rules out:* client-declared scores, boards sent by the client, and unv
 **Target player.** Someone who likes a tidy, bounded puzzle in a browser tab: minesweeper-at-lunch, not
 a session with a save file to manage.
 
-**First 60 seconds.** Boot lands on the title with three buttons. `Play` with no save opens the Journey
+**First 60 seconds.** Boot lands on the title with four buttons (Play, Modes & progress, How to play, Settings). `Play` with no save opens the Journey
 stage the player has unlocked (stage 1 first time); the setup screen names the board — colours, pegs,
 capacity, par, and one sentence of rules — before anything is committed. `Modes & progress → Learn`
 opens the four lessons, which teach by requiring the action: Lesson 1 states that loops lift from the
@@ -293,15 +295,39 @@ UI is 9–14 px radii, one weight of the system sans, no decorative type.
 
 **Motion.** One easing (ease-out cubic) and one duration (0.28 s) for loop travel; tweens are replaced,
 never stacked, so an interrupted move never accumulates drift. Lift raises 1.1 units. Particles are a
-bounded pool (150/400/900 by quality tier) with gravity −2.4. Shake is capped at 0.05 for a peg
+bounded pool (150 or 900 by the Particles setting) with gravity −2.4. Shake is capped at 0.05 for a peg
 completion and 0.12 for a win, decaying ×0.85 per frame, and never affects raycasting. Pointer parallax
 is ±0.06/0.04 units of camera offset.
 
 **Reduced motion** (setting or `prefers-reduced-motion`) removes all tweens, particles, shake, parallax
 and CSS transitions; loops jump to their exact positions and the game is fully playable.
 
-**Quality tiers.** auto (by `navigator.deviceMemory`), low (DPR 1, no shadows, 150 particles, low-poly
-tori), medium, high (DPR 2, 900 particles). Shadow map 1024².
+**Graphics.** The renderer uses ACES filmic tone mapping with sRGB output, a warm key directional light
+with PCF soft shadows whose shadow box is fitted to the peg row and mat (refitted when the peg count
+changes), a hemisphere fill and a cool rim. Optional effects: image-based lighting from a prefiltered
+`RoomEnvironment` (reflections on brass; low intensity so the atelier stays warm and dim); a detailed
+material set — loops in `MeshPhysicalMaterial` with sheen and a procedural yarn-twist texture used as
+colour and bump map, clear-coated brass pegs with a turned collar, spools with wooden flanges and
+higher-segment geometry; GTAO contact darkening; bloom limited to highlights (threshold 0.9: sparks,
+brass glints); a colour grade (gentle S-curve, +10 % saturation, warm highlights / cool shadows) with
+vignette; FXAA/SMAA/MSAA; soft additive particles tinted with the completed peg's yarn colour; and
+ambient motion — ~70 dust motes drifting behind the pegs, a shallow lamp shimmer on the key light and a
+breathing warm glow over the menu backdrop. Ambient motion and particles stop under reduced motion.
+The Settings panel's **Graphics** section (reachable from the title and pause screens) offers a
+quality preset — Auto (chosen from the unmasked WebGL renderer string: software renderers get Low,
+discrete GPUs and Apple M get High, others Balanced; touch devices cap at Balanced), Low, Balanced,
+High, Ultra — a render scale (50–200 %), one override per category ("From preset (…)" by default):
+shadows (off / low 1024² / medium 2048² / high 4096²), ambient occlusion (off/on/high), bloom, colour
+grade, anti-aliasing (off/FXAA/SMAA/MSAA), reflections, particles (low/high), ambient motion
+(still/animated) and detail (plain/detailed); adaptive resolution (averages 90 frames, steps down 0.1 to
+a floor of 0.6 when frames exceed 26 ms, back up 0.05 below 14 ms); a frame-rate readout (bottom-left,
+under the HUD controls); and a summary "GPU · cost · W×H px". Pixel ratio is
+min(DPR, preset cap: Low 1, Balanced 1.5, High/Ultra 2) × preset scale (Ultra 1.25) × render scale ×
+adaptive scale. Low renders with no post chain, no shadows and no environment map — the pre-upgrade
+cost. Choosing a preset clears overrides; changes apply live and persist in `settings.graphics`
+(the old `quality` tier migrates onto a preset). If the post chain cannot be built the game renders
+without it and the panel says so. The preset is exposed as `data-gfx-preset` on `<body>` and the canvas.
+Panel strings are localized in all nine locales (§10).
 
 **Visual assets the design calls for.** A warm atelier key art that shows the actual object the game is
 about (cover); a very dark, defocused atelier interior behind the menu overlays so the title screen has
@@ -364,6 +390,9 @@ announcements), colour names in `src/content.js` and caption strings in `src/aud
 — so a 35 % expansion into de-DE fits without reflow work. Extracting these strings into a locale table
 with a `navigator.language` chooser and a settings override is the largest outstanding gap in the game;
 see §17.
+The one exception is the Graphics settings section and the title's Settings button, whose strings live in
+`src/gfx-i18n.js` for all nine locales and are chosen from `navigator.language` (closest match, en-US
+fallback).
 
 ---
 
@@ -472,7 +501,7 @@ known GPU noise or an expected offline `/api/*` 404 fails the run.
 
 ## 14. Testing and acceptance criteria
 
-`npm test` builds the bundle and runs 31 `node --test` cases:
+`npm test` builds the bundle and runs 37 `node --test` cases:
 
 - **Rules** — group lift boundaries, capacity truncation, every rejection reason, invalid tallying,
   solved and move-limit terminals, monotonic `tick`, integer score components, serialization round-trip,
@@ -484,10 +513,16 @@ known GPU noise or an expected offline `/api/*` 404 fails the run.
   determinism, invalid attempts counted exactly once and surviving a replay, snapshot round-trip,
   malformed envelopes rejected without throwing, journey unlock advancing exactly one stage, stable
   achievement ids, and a golden test pinning representative session scores.
+- **Graphics** — `detectPreset` on sample GPU strings (software, discrete, integrated, mobile cap),
+  `resolve` with presets/overrides/invalid tiers/scale clamp, preset choice clearing overrides,
+  `describe`, and every graphics string present in all nine locales.
 
 `npm run test:e2e` runs three passes — desktop 1280×800, mobile 390×844 with touch, and a no-WebGL pass
 — each covering title, modes open/close (button and `Escape`), setup, round start, a deliberate illegal
-drop (rejected, board unchanged, charged exactly −15 once), pause → settings → resume, a full solve
+drop (rejected, board unchanged, charged exactly −15 once), title → Settings → Graphics (Auto resolves to
+Low on the software GPU; Ultra, Low and High applied and reflected in `data-gfx-preset` and the summary; a
+bloom override and the frame-rate readout survive a reload; picking a preset clears the override),
+pause → settings → resume, a full solve
 through the peg buttons, the results screen reading "Loom complete!", and the return to title.
 
 **QA bar, as checkable statements.** Every mode the title and modes screens expose is reachable and
