@@ -588,3 +588,7 @@ theme colours and the `#17130f` backdrop ground stay in place and nothing else c
 3. **Server-backed friend comparison.** `fetchScores` and the server's GET board exist, but the results
    screen only reads the local board, so an online player sees their own history rather than the global
    top entries.
+
+## Browser interference
+
+`browser-guard.js` (loaded from `index.html`) suppresses browser UI that gets in the way of play: the right-click context menu, the iOS long-press callout, copy / cut / paste, and page text selection. Text fields (inputs, textareas, selects, contenteditable) keep normal selection, context menu and clipboard behaviour.
