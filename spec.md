@@ -32,10 +32,12 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 | `src/gfx.js` | Pure graphics quality model: presets, categories, GPU detection, `resolve` / `presetTier` / `choosePreset` / `describe` |
 | `src/gfx-i18n.js` | Graphics panel strings in the nine locales and the `navigator.language` locale picker |
 | `src/audio.js` | WebAudio buses, authored clip playback with procedural fallback, ambience, adaptive music, captions |
-| `src/platform.js` | StarHermit adapter: fragment launch-token handshake + 45-min refresh, Bearer auth, nickname profile, cloud-save mirror (zip+base64), read-only leaderboards; hosted mode iff a fragment token was read |
-| `src/server-time.js` | Round-trip-corrected server clock and the UTC day number the Daily uses |
-| `server.js` | Local-dev backend: static host + API (time, daily, replay-validated scores, achievements, presence); not exercised on-platform |
-| `tests/rules.test.js` `tests/content.test.js` `tests/session.test.js` `tests/gfx.test.js` | `node --test` unit/property/golden/graphics-model suites |
+| `starhermit-sdk.js` | Shared StarHermit client (unmodified copy, loaded by `index.html`) |
+| `src/platform.js` | Adapter over the SDK: handshake, sign-in/invite, nickname, cloud-save mirror, settings KV, key bindings, read-only leaderboard; dev-server routes off-platform only |
+| `src/sh-strings.js` | Account strings in the nine locales |
+| `src/server-time.js` | UTC day number the Daily uses; round-trip-corrected `GET /api/v1/time` when signed in, local clock standalone |
+| `server.js` | Local-dev backend: static host + API (time, daily, replay-validated scores, achievements, presence); the client no longer calls these routes |
+| `tests/rules.test.js` `tests/content.test.js` `tests/session.test.js` `tests/gfx.test.js` `tests/platform.test.js` | `node --test` unit/property/golden/graphics-model suites, plus the StarHermit adapter over the real SDK with a stubbed fetch |
 | `tests/e2e.mjs` | Playwright-core playthrough of the real UI at three viewports |
 | `sfx/manifest.txt` | Canonical clip table (`file \| event id \| description \| usage`); `manifest.json` drives generation |
 | `assets/` | `atelier-backdrop.webp` (menu backdrop), `linen-weave.webp` (table/mat texture) |
@@ -125,8 +127,8 @@ Move the top same-colour group from peg *A* to peg *B*.
 `applyCommand` (`src/session.js`) is the only entry point. Per move: dedupe by command id → `applyMove`
 → on rejection, log an `invalid` command and return the reason → on success, push the pre-move state to
 the undo stack, append the command, append the state hash, and call `finish()` if the round terminated.
-Presentation follows: `render.setBoard` (tween), `dropEffect`, the `move` clip, a snapshot save, a
-presence heartbeat, HUD/rail/mirror refresh, and a live-region announcement of the full board.
+Presentation follows: `render.setBoard` (tween), `dropEffect`, the `move` clip, a snapshot save,
+HUD/rail/mirror refresh, and a live-region announcement of the full board.
 
 ### Terminal states
 
@@ -200,10 +202,10 @@ concept just taught under a move limit before the next colour is introduced.
 **Unlocks.** Clearing Journey stage *n* sets `journeyUnlocked = max(current, min(n, 47))` — exactly one
 stage forward, so `Play` always resumes at the frontier. Five achievements: First Weave, Apprentice of
 the Loom (all four lessons), Seven Suns (7 distinct Daily days), Master Weaver (a difficulty-8+ stage),
-Hundred Hands (100 rounds). Grants are idempotent and mirrored to the host.
+Hundred Hands (100 rounds). Grants are idempotent and local (mirrored by the cloud save when signed in).
 
-**Daily integrity.** `content.validateAll()` runs at boot. If a `daily-*` record fails validation the
-client sets `dailyExcluded` and stops submitting that day rather than silently swapping the board.
+**Daily integrity.** `content.validateAll()` runs at boot. A failing `daily-*` record is reported
+(console warning + `error` funnel count) rather than silently swapped.
 
 ---
 
@@ -422,35 +424,49 @@ fallback).
 
 `starhermit.txt` declares `name`, `launch=index.html`, `owner`, `server=server.js`, `cover=coverart.png`.
 
-**Used.** Launch-token handshake: the platform delivers the token in the URL
-fragment (`#game_token=<jwt>`); `platform.handshake()` reads it once, decodes
-`sub` + `game_scope` (base64url, no verify), holds it in memory only — never in
-storage — scrubs the fragment via `history.replaceState`, and re-mints it every
-45 min (`POST /api/v1/games/{slug}/launch-token`, ~60 s retry on failure).
-`Authorization: Bearer` rides every REST call. The account nickname comes from
-`GET /api/v1/users/{sub}/profile` (never `/api/v1/me`, never usernames;
-fallback `"Player " + sub.slice(0,8)`) and is shown in the status rail and on
-the title screen. Cloud save mirrors the localStorage doc (progress, settings,
-scores) to the single slot `GET/PUT /api/v1/me/cloud-saves/{slug}` as
-zip+base64 — remote wins on conflict, saves debounce ~2 s and flush on
-pagehide, and the status rail shows synced/saving/offline. Hosted leaderboards
-are read-only: `GET /api/v1/games/{slug}` → `leaderboardId`, then
-`GET /api/v1/leaderboards/{id}/entries` with names resolved via the profile
-route; personal bests stay local and cloud-mirrored. Achievements stay local
-(part of the cloud-saved doc). Query-param tokens (`?launch_token=`, `?token=`)
-remain local-dev fallbacks against the repo's own `server.js`, which also
-serves time sync, activity start/end, throttled presence heartbeats,
-replay-validated score submission, achievements and consent-gated telemetry
-when running standalone; none of those fabricated routes are called on
-StarHermit, so hosted play produces no failed API calls.
+`starhermit.txt` also lists one `control.<action>=<Code>[+<Code>] | <Label>` line per keyboard
+action (left, right, up, down, confirm, cancel, undo, hint, pause, camera).
 
-**Not used.** Real-time multiplayer, matchmaking, parties, chat, friends lists,
-entitlements or purchases, and client score submission to the platform-owned
-leaderboard. Loop Loom is solo; the social surfaces are the read-only hosted
+**Used.** All platform calls go through the shared client `starhermit-sdk.js` (loaded before
+the bundle) via `src/platform.js`; without a launch token nothing calls the platform.
+
+- **Launch token + renewal.** `platform.handshake()` calls `StarHermit.init()`, which reads
+  `#game_token=` (library launch) or `#access_token=` (sign-in return) once, keeps it in memory
+  only, scrubs the fragment and renews it before expiry. If renewal is refused the game toasts
+  "signed out", hides the invite button and keeps playing and saving locally.
+- **Sign-in.** On `<id>.starhermit.com` without a token the title shows **Sign in with
+  StarHermit**; hidden when signed in and when running locally.
+- **Nickname.** Profile `nickname` (fallback `Player <id prefix>`; never `/api/v1/me`, never
+  usernames), shown in the status rail and on the title screen.
+- **Cloud save.** The localStorage doc (progress, settings, scores) is mirrored to the
+  `game:<slug>` cloud-save slot — remote wins on load, saves debounce ~2 s and flush with
+  keepalive on pagehide/hidden tab; the status rail shows synced/saving/offline.
+- **Settings KV.** Every preference except key bindings (volumes, mute, motion, palette,
+  contrast, text size, left-handed, hold-to-lift, timing assist, haptics, telemetry consent,
+  graphics, difficulty) is patched to the per-player settings store on change (changed keys
+  only); at boot the stored values override local ones.
+- **Controls.** Keyboard input is routed by `event.code` through `StarHermit.loadBindings()`
+  (defaults = the local bindings, matching the manifest `control.*` lines); the Help controls
+  list shows the effective keys.
+- **Invite link.** Signed-in players get **Invite a friend** on the title, copying
+  `StarHermit.inviteLink()` with a confirmation toast.
+- **Leaderboard (read-only).** The game's first platform board, when one exists, is shown
+  in the rails with names resolved via profiles (`StarHermit.leaderboard()`); personal bests
+  stay local and cloud-mirrored. Achievements stay local (part of the cloud-saved doc).
+
+Account strings are localized in the nine locales (`src/sh-strings.js`). Query-string tokens
+(`?game_token=`) remain a local-dev convenience. Signed in, the only own-server route used is
+`GET /api/v1/time` (Daily UTC day). Standalone (no launch token) the client makes no request to
+any `/api` or `/ws` route: local clock, local boards and achievements, no activity, presence,
+score submission or telemetry. The repo's `server.js` still implements those routes but the
+client never calls them.
+
+**Not used.** Platform sessions, real-time multiplayer, matchmaking, parties, chat,
+friend-picker invites, replays, entitlements or purchases, and client score submission to the
+platform-owned leaderboard (`server.js` is a standalone Node host, not a platform game script,
+so it reports no scores, achievements or replays). Loop Loom is solo; the social surfaces are the read-only hosted
 board and asynchronous personal-best comparison. The game is fully playable
-with the whole API unreachable — every call resolves to
-`{ ok: false, error: 'offline' }`, the status rail says so, and scores fall
-back to the local boards.
+with no network: the status rail reads "Playing locally" and scores live on the local boards.
 
 **Anti-cheat.** `POST /api/v1/scores` never trusts a client board or score. It re-derives the record from
 `contentId`, rejects mismatched content or rules versions with 409, replays the command log through the
@@ -480,8 +496,8 @@ hash and score. A property test drives random command streams through it.
 top 20 per day), `looploom.sessionid.v1`, `looploom.analytics.v1`. Every read and write is wrapped, so
 blocked or full storage degrades to an in-memory session.
 
-**Lifecycle.** Hiding the tab pauses an active round, saves a snapshot, stops the render loop and ends
-the activity; returning restarts the renderer, restarts activity and toasts a "while you were away"
+**Lifecycle.** Hiding the tab pauses an active round, saves a snapshot, and stops the render loop;
+returning restarts the renderer and toasts a "while you were away"
 line. `webglcontextlost` is preventDefaulted and drops to the DOM board; `webglcontextrestored` rebuilds
 the scene and re-pushes the board.
 
@@ -495,7 +511,8 @@ eight invisible cylinders, never the scenery or the particles.
 Chrome, and clicks only visible controls. It reads the board back out of the mirror buttons'
 `aria-label`s, runs its own BFS (an independent re-implementation of the legality rules, so a rules bug
 would desynchronise it), and clicks its way to a solve. Any console error or page error that is not
-known GPU noise or an expected offline `/api/*` 404 fails the run.
+known GPU noise fails the run, as does any same-origin `/api` or `/ws` request (all passes are
+standalone).
 
 ---
 

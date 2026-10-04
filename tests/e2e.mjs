@@ -14,8 +14,8 @@
  *
  * The repo's server.js is the StarHermit authoritative game script, so this
  * test embeds its own minimal static server on an ephemeral port. The game
- * is fully playable offline; its platform calls to /api/* are expected to
- * 404 against the static server and those resource errors are ignored.
+ * runs standalone (no launch token) and must make zero same-origin /api or
+ * /ws requests; any such request fails the pass.
  *
  * Run: npm run test:e2e
  */
@@ -53,7 +53,7 @@ const MIME = {
 function startServer() {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
-    if (url.pathname.startsWith('/api/')) { // offline: platform degrades gracefully
+    if (url.pathname.startsWith('/api/')) { // standalone never calls these (asserted below)
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'offline' }));
       return;
@@ -139,13 +139,12 @@ async function runPass(tag, contextOpts) {
   const context = await browser.newContext(contextOpts);
   const page = await context.newPage();
   const errors = [];
+  // Standalone (no launch token) must not touch any own-server route.
+  page.on('request', (r) => { const u = new URL(r.url()); if (/^https?:$/.test(u.protocol) && /^\/(api|ws)(\/|$)/.test(u.pathname)) errors.push(`standalone requested ${r.method()} ${u.pathname}`); });
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
     if (m.type() !== 'error' && m.type() !== 'warning') return;
     if (browserNoise.test(m.text())) return;
-    // Expected offline behavior: platform calls to /api/* 404 against the
-    // embedded static server; Chrome logs these as resource errors.
-    if (m.text().includes('Failed to load resource') && (m.location()?.url || '').includes('/api/')) return;
     errors.push(`console: ${m.text()} @ ${m.location()?.url || ''}`);
   });
 
@@ -344,6 +343,7 @@ async function runCompatPass() {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
   const errors = [];
+  page.on('request', (r) => { const u = new URL(r.url()); if (/^https?:$/.test(u.protocol) && /^\/(api|ws)(\/|$)/.test(u.pathname)) errors.push(`standalone requested ${r.method()} ${u.pathname}`); });
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   await page.addInitScript(() => {
     const real = HTMLCanvasElement.prototype.getContext;

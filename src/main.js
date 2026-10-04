@@ -10,6 +10,7 @@ import * as session from './session.js';
 import * as render from './render.js';
 import * as audio from './audio.js';
 import * as platform from './platform.js';
+import { shStrings } from './sh-strings.js';
 import * as serverTime from './server-time.js';
 import { CATEGORIES, PRESETS, presetTier, choosePreset } from './gfx.js';
 import { gfxStrings } from './gfx-i18n.js';
@@ -30,7 +31,6 @@ let pendingRecord = null;    // record chosen in setup
 let pendingMode = 'practice';
 let selectedPeg = null;      // lifted group source
 let kbFocusPeg = 0;          // keyboard navigation index
-let dailyExcluded = false;   // defective daily days are excluded from ranking
 let render3d = true;
 let speedTimer = null;
 let journeyPick = 0;
@@ -150,6 +150,56 @@ function applySettings() {
   document.body.classList.toggle('a11y-board-hidden', false);
 }
 
+// Account strings (sign-in, invite, toasts) in the player's locale.
+const shT = shStrings(typeof navigator !== 'undefined' ? (navigator.languages || [navigator.language]) : []);
+
+// Preferences mirrored to the StarHermit settings KV (key bindings travel via
+// the platform controls API instead).
+function kvSettings() {
+  const o = Object.assign({}, settings);
+  delete o.bindings;
+  return o;
+}
+function persistSettings() {
+  session.saveSettings(settings);
+  platform.pushSettings(kvSettings());
+}
+
+// Effective keyboard bindings {action: codes[]}: the local per-device codes,
+// replaced by the player's StarHermit controls when signed in.
+let keyBindings = null;
+function defaultKeyBindings() {
+  const out = {};
+  for (const [k, v] of Object.entries(settings.bindings)) out[k] = [v];
+  out.confirm = out.confirm.concat(out.confirm.includes('Space') ? [] : ['Space']);
+  return out;
+}
+function keyLabel(code) {
+  const named = { ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', Escape: 'Esc' };
+  if (named[code]) return named[code];
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+  if (/^Digit\d$/.test(code)) return code.slice(5);
+  return code || '—';
+}
+const keysFor = (action) => (keyBindings[action] || []).map(keyLabel).join('/');
+
+const SETTING_FIELDS = [
+  ['set-music', 'music', true], ['set-effects', 'effects', true], ['set-ambience', 'ambience', true],
+  ['set-voice', 'voice', true], ['set-muted', 'muted'], ['set-motion', 'reducedMotion'],
+  ['set-palette', 'palette'], ['set-contrast', 'highContrast'], ['set-text', 'largerText'],
+  ['set-left', 'leftHanded'], ['set-hold', 'holdToLift'], ['set-timing', 'timingAssist'],
+  ['set-haptics', 'haptics'], ['set-telemetry', 'telemetryConsent'],
+];
+// Re-read the form from `settings` (after a cloud / settings-KV load).
+function syncSettingsForm() {
+  for (const [id, key, isRange] of SETTING_FIELDS) {
+    const el = $(id);
+    if (isRange) el.value = settings[key];
+    else if (el.type === 'checkbox') el.checked = !!settings[key];
+    else el.value = settings[key];
+  }
+}
+
 function bindSettings() {
   const bind = (id, key, isRange) => {
     const el = $(id);
@@ -157,7 +207,7 @@ function bindSettings() {
       if (isRange) el.value = settings[key]; else el.checked = !!settings[key];
       el.addEventListener('change', () => {
         settings[key] = isRange ? parseFloat(el.value) : el.checked;
-        session.saveSettings(settings);
+        persistSettings();
         platform.cloudSave(session.exportDoc());
         session.track('settings-change');
         applySettings();
@@ -166,27 +216,14 @@ function bindSettings() {
       el.value = settings[key];
       el.addEventListener('change', () => {
         settings[key] = el.value;
-        session.saveSettings(settings);
+        persistSettings();
         platform.cloudSave(session.exportDoc());
         session.track('settings-change');
         applySettings();
       });
     }
   };
-  bind('set-music', 'music', true);
-  bind('set-effects', 'effects', true);
-  bind('set-ambience', 'ambience', true);
-  bind('set-voice', 'voice', true);
-  bind('set-muted', 'muted');
-  bind('set-motion', 'reducedMotion');
-  bind('set-palette', 'palette');
-  bind('set-contrast', 'highContrast');
-  bind('set-text', 'largerText');
-  bind('set-left', 'leftHanded');
-  bind('set-hold', 'holdToLift');
-  bind('set-timing', 'timingAssist');
-  bind('set-haptics', 'haptics');
-  bind('set-telemetry', 'telemetryConsent');
+  for (const [id, key, isRange] of SETTING_FIELDS) bind(id, key, isRange);
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +238,7 @@ let gfxRefreshTimer = 0;
 function saveGraphics(next) {
   settings.graphics = next;
   settings.quality = next.preset || 'auto'; // legacy mirror
-  session.saveSettings(settings);
+  persistSettings();
   platform.cloudSave(session.exportDoc());
   session.track('settings-change');
   render.setGraphics(settings.graphics);
@@ -289,7 +326,6 @@ function refreshGraphicsUI() {
 
 function showHelp(returnTo) {
   helpReturn = returnTo;
-  const b = settings.bindings;
   $('help-text').innerHTML = `
     <p><strong>Goal:</strong> move loops between pegs — keeping their stack order — until every peg holds a single color.</p>
     <h2>Rules</h2>
@@ -301,7 +337,7 @@ function showHelp(returnTo) {
     <h2>Controls</h2>
     <ul>
       <li>Pointer/touch: tap a peg to lift, tap a target to drop. Drag also works.</li>
-      <li>Keyboard: <b>${b.left}/${b.right}</b> choose peg, <b>${b.confirm}</b> lift/drop, <b>${b.cancel}</b> cancel, <b>${b.undo.replace('Key', '')}</b> undo, <b>${b.hint.replace('Key', '')}</b> hint, <b>${b.pause.replace('Key', '')}</b> pause, <b>${b.camera.replace('Key', '')}</b> reset camera.</li>
+      <li>Keyboard: <b>${keysFor('left')} ${keysFor('right')} ${keysFor('up')} ${keysFor('down')}</b> choose peg, <b>${keysFor('confirm')}</b> lift/drop, <b>${keysFor('cancel')}</b> cancel, <b>${keysFor('undo')}</b> undo, <b>${keysFor('hint')}</b> hint, <b>${keysFor('pause')}</b> pause, <b>${keysFor('camera')}</b> reset camera.</li>
       <li>Gamepad: D-pad/left stick chooses a peg, south button lifts/drops, east cancels, start pauses.</li>
     </ul>
     <h2>Scoring</h2>
@@ -365,7 +401,7 @@ function openSetup(mode, record) {
     sel.value = settings.difficulty;
     sel.addEventListener('change', () => {
       settings.difficulty = parseInt(sel.value, 10);
-      session.saveSettings(settings);
+      persistSettings();
       openSetup('practice', content.getPractice(settings.difficulty, Date.now() % 100000));
     });
     row.appendChild(sel);
@@ -469,23 +505,14 @@ function endRound(reason) {
   session.saveProgress(progress);
   for (const id of unlocked) {
     audio.playEvent('achievement');
-    platform.unlockAchievement(id);
   }
-  // Score boards: local always; authoritative submission for daily/chase.
+  // Score boards: local records; platform leaderboards are read-only.
   const entry = Object.assign({}, r, {
     contentId: current.record.id, seed: current.record.seed,
     version: current.record.version, day: current.record.day,
   });
   if (r.solved) session.recordScore(entry);
   platform.cloudSave(session.exportDoc());
-  // Platform leaderboards are script-owned and read-only; submission exists
-  // only against the repo's own dev server (local play).
-  if (!platform.isHosted() && (current.mode === 'daily' || current.mode === 'chase') && r.solved && !dailyExcluded) {
-    platform.submitScore(current.replayEnvelope()).then((res) => {
-      if (res.ok) toast('Score submitted to the global board.');
-      else if (res.error !== 'offline') toast('Score rejected: ' + res.error);
-    });
-  }
   showResults(unlocked, reason);
 }
 
@@ -570,9 +597,7 @@ function updateRails() {
   $('rail-mode').textContent = `Mode: ${pendingMode} · ${current.record.title || ''}`;
   $('rail-online').textContent = platform.isHosted() ?
     `${platform.getNickname()} · cloud save ${syncLabel()}` :
-    platform.isOnline() ?
-      'Connected — scores submit to the global board.' :
-      'Offline — playing locally; scores are stored on this device.';
+    'Playing locally — scores are stored on this device.';
   $('rail-objective').textContent = current.record.challenge ? current.record.challenge.text :
     'Move loops between pegs until every peg holds one color.';
   $('rail-progress').textContent = `Par ${current.record.par} · seed ${current.record.seed.toString(16)}`;
@@ -695,7 +720,6 @@ function onPegChosen(i) {
   audio.playEvent('move');
   if (settings.haptics && navigator.vibrate) navigator.vibrate(14);
   session.saveSnapshot(current);
-  platform.presenceHeartbeat();
   updateHud();
   updateRails();
   updateA11yBoard();
@@ -806,12 +830,12 @@ function bindPointer(canvas) {
 
 function bindKeyboard() {
   document.addEventListener('keydown', (e) => {
-    const b = settings.bindings;
+    const is = (action) => (keyBindings[action] || []).includes(e.code);
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) return;
     const inGame = appState === 'active' || appState === 'tutorial';
-    if (e.code === b.pause || (e.code === 'Escape' && appState === 'active')) { e.preventDefault(); togglePause(); return; }
-    // Escape backs out of the open overlay rather than doing nothing.
-    if (e.code === 'Escape' && !inGame) {
+    if (is('pause') || (is('cancel') && appState === 'active')) { e.preventDefault(); togglePause(); return; }
+    // Cancel (Escape) backs out of the open overlay rather than doing nothing.
+    if (is('cancel') && !inGame) {
       const open = SCREENS.find((s) => {
         const el = document.querySelector(`[data-screen="${s}"]`);
         return el && !el.classList.contains('hidden');
@@ -822,18 +846,18 @@ function bindKeyboard() {
     }
     if (!inGame) return;
     const n = current ? current.state.pegs.length : 0;
-    if (e.code === b.left) { kbFocusPeg = (kbFocusPeg - 1 + n) % n; updateA11yBoard(); e.preventDefault(); }
-    else if (e.code === b.right) { kbFocusPeg = (kbFocusPeg + 1) % n; updateA11yBoard(); e.preventDefault(); }
-    else if (e.code === b.up) { kbFocusPeg = Math.max(0, kbFocusPeg - 1); updateA11yBoard(); e.preventDefault(); }
-    else if (e.code === b.down) { kbFocusPeg = Math.min(n - 1, kbFocusPeg + 1); updateA11yBoard(); e.preventDefault(); }
-    else if (e.code === b.confirm || e.code === 'Space') { onPegChosen(kbFocusPeg); e.preventDefault(); }
-    else if (e.code === b.cancel) {
+    if (is('left')) { kbFocusPeg = (kbFocusPeg - 1 + n) % n; updateA11yBoard(); e.preventDefault(); }
+    else if (is('right')) { kbFocusPeg = (kbFocusPeg + 1) % n; updateA11yBoard(); e.preventDefault(); }
+    else if (is('up')) { kbFocusPeg = Math.max(0, kbFocusPeg - 1); updateA11yBoard(); e.preventDefault(); }
+    else if (is('down')) { kbFocusPeg = Math.min(n - 1, kbFocusPeg + 1); updateA11yBoard(); e.preventDefault(); }
+    else if (is('confirm')) { onPegChosen(kbFocusPeg); e.preventDefault(); }
+    else if (is('cancel')) {
       if (selectedPeg !== null) { selectedPeg = null; render.setSelection(null); render.clearPreview(); updateA11yBoard(); audio.playEvent('deselect'); }
       e.preventDefault();
     }
-    else if (e.code === b.undo) { doUndo(); e.preventDefault(); }
-    else if (e.code === b.hint) { doHint(); e.preventDefault(); }
-    else if (e.code === b.camera) { render.resetCamera(); e.preventDefault(); }
+    else if (is('undo')) { doUndo(); e.preventDefault(); }
+    else if (is('hint')) { doHint(); e.preventDefault(); }
+    else if (is('camera')) { render.resetCamera(); e.preventDefault(); }
   });
 }
 
@@ -886,9 +910,7 @@ function bindLifecycle() {
         setScreen('pause');
         session.saveSnapshot(current);
       }
-      platform.activityEnd();
     } else {
-      platform.activityStart();
       restartRenderer();
       // "While you were away" summary.
       if (current && appState === 'paused') {
@@ -899,7 +921,6 @@ function bindLifecycle() {
   });
   window.addEventListener('beforeunload', () => {
     session.saveSnapshot(current);
-    platform.activityEnd();
   });
   // WebGL context recovery: rebuild GPU resources from retained descriptors.
   const canvas = $('game-canvas');
@@ -928,6 +949,15 @@ function restartRenderer() {
 
 function wireButtons() {
   const click = (id, fn) => $(id).addEventListener('click', () => { audio.unlock(); audio.playEvent('click'); fn(); });
+  $('btn-signin').textContent = shT.signIn;
+  $('btn-invite').textContent = shT.invite;
+  click('btn-signin', () => platform.signIn());
+  click('btn-invite', async () => {
+    const link = platform.inviteLink();
+    if (!link) return;
+    try { await navigator.clipboard.writeText(link); toast(shT.copied); }
+    catch { toast(shT.copyFailed); }
+  });
   // Backing out of a screen gets its own lower, softer cue than a forward press.
   const clickBack = (id, fn) => $(id).addEventListener('click', () => { audio.unlock(); audio.playEvent('back'); fn(); });
   click('btn-play', () => {
@@ -997,13 +1027,22 @@ function refreshTitle() {
   $('title-status').textContent = who +
     `Journey ${done}/${content.journeyCount} · Daily day ${serverTime.utcDay()} · ` +
     (platform.isHosted() ? 'cloud save ' + syncLabel()
-      : platform.isOnline() ? 'online' : 'offline (local play)');
+      : 'local play');
+  // Sign-in (platform host, no token) and invite (signed in); hidden locally.
+  $('btn-signin').classList.toggle('hidden', !platform.canSignIn());
+  $('btn-invite').classList.toggle('hidden', !platform.isHosted());
 }
 
 async function boot() {
   transition('boot', 'initial load');
   setScreen('loading');
   platform.handshake();
+  keyBindings = defaultKeyBindings();
+  platform.onAuth((a) => {
+    refreshTitle();
+    if (current) updateRails();
+    if (!a.signedIn) toast(shT.signedOut); // keep playing locally
+  });
   // Capability detection: WebGL required for 3D; 2D accessible board is the fallback.
   const canvas = $('game-canvas');
   try {
@@ -1023,18 +1062,27 @@ async function boot() {
   bindKeyboard();
   bindLifecycle();
   requestAnimationFrame(pollGamepad);
-  // Core data first, scenic lazily; server time + content validation.
+  // Core data first, scenic lazily; server time (signed in only) + content validation.
   await platform.syncTime();
   // Hosted: pull the account nickname and the remote save (remote wins on
   // conflict), then the read-only leaderboard; everything degrades silently.
   if (platform.isHosted()) {
-    await platform.fetchProfile();
-    const remote = await platform.cloudLoad();
+    const [, remote, kv, binds] = await Promise.all([
+      platform.fetchProfile(), platform.cloudLoad(), platform.loadSettings(), platform.loadBindings(keyBindings),
+    ]);
+    keyBindings = binds;
     if (remote && session.importDoc(remote)) {
       settings = session.loadSettings();
       progress = session.loadProgress();
-      applySettings();
     }
+    // Settings KV wins over the local / cloud-save copy, key by key.
+    let tuned = false;
+    for (const k of Object.keys(kvSettings())) {
+      if (kv[k] !== undefined && kv[k] !== null) { settings[k] = kv[k]; tuned = true; }
+    }
+    if (tuned) session.saveSettings(settings);
+    platform.primeSettings(kvSettings());
+    if (remote || tuned) { applySettings(); syncSettingsForm(); }
     platform.refreshHostedBoard().then(() => {
       if (current) updateRails();
       refreshTitle();
@@ -1044,11 +1092,8 @@ async function boot() {
   const bad = report.filter((r) => !r.ok);
   if (bad.length) {
     session.track('error');
-    // Defective content: mark excluded from ranking rather than replacing it.
-    if (bad.some((r) => r.id.startsWith('daily-'))) dailyExcluded = true;
     console.warn('content validation issues', bad);
   }
-  platform.activityStart();
   refreshProgressRail();
   refreshTitle();
   transition('title', 'boot complete');
