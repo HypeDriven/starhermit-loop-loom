@@ -59,6 +59,9 @@
   button.ghost { background: transparent; color: var(--dim); }
   button[disabled] { opacity: .45; cursor: not-allowed; }
   .hidden { display: none !important; }
+  /* Large screens: each UI layer zooms by --ui-scale (ui-scale.js; 1 at or below 1600x1000);
+     the canvas and backdrop stay unzoomed. vw/vh lengths are divided by the scale. */
+  #hud, .rail, #action-tray, #a11y-board, .overlay, #fps-meter, #caption-line, #toast { zoom: var(--ui-scale, 1); }
 
   /* ---------- shared layout model ---------- */
   #hud {
@@ -96,7 +99,7 @@
   #a11y-board {
     position: absolute; bottom: calc(66px + var(--safe-bottom)); left: 50%; transform: translateX(-50%);
     display: flex; gap: 8px; z-index: 2; background: var(--panel); padding: 8px 10px; border-radius: 12px;
-    max-width: calc(100vw - 20px); overflow-x: auto;
+    max-width: calc(calc(100vw / var(--ui-scale, 1)) - 20px); overflow-x: auto;
   }
   body.a11y-board-hidden #a11y-board { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .peg-btn {
@@ -114,7 +117,7 @@
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     background: var(--panel); border-radius: 14px; padding: 22px 26px;
     box-shadow: 0 12px 40px rgba(0,0,0,.5); text-align: center;
-    min-width: 300px; max-width: min(92vw, 560px); max-height: 86vh; overflow-y: auto; z-index: 5;
+    min-width: 300px; max-width: min(calc(92vw / var(--ui-scale, 1)), 560px); max-height: calc(86vh / var(--ui-scale, 1)); overflow-y: auto; z-index: 5;
   }
   .overlay h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: .5px; }
   .overlay h2 { font-size: 18px; margin: 14px 0 6px; color: var(--accent); }
@@ -148,7 +151,7 @@
     background: rgba(0,0,0,.45); padding: 2px 6px; border-radius: 5px;
   }
   @media (max-width: 420px) {
-    .overlay[data-screen="settings"] { padding: 18px 14px; min-width: 0; width: calc(100vw - 20px); }
+    .overlay[data-screen="settings"] { padding: 18px 14px; min-width: 0; width: calc(calc(100vw / var(--ui-scale, 1)) - 20px); }
     .gfx-range input[type=range] { width: 92px; }
   }
 
@@ -170,8 +173,8 @@
 
   #live-region { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   #caption-line {
-    position: absolute; bottom: calc(140px + var(--safe-bottom)); left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,.75); border-radius: 8px; padding: 4px 14px; font-size: 14px; z-index: 4;
+    position: absolute; bottom: calc(172px + var(--safe-bottom)); left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,.75); border-radius: 8px; padding: 4px 14px; font-size: 14px; z-index: 6;
   }
   #toast {
     position: absolute; top: calc(70px + var(--safe-top)); left: 50%; transform: translateX(-50%);
@@ -182,9 +185,9 @@
   @media (max-width: 1023px) {
     .rail { display: none; } /* collapse into drawers */
     .rail.drawer-open {
-      display: block; position: absolute; top: auto; bottom: calc(120px + var(--safe-bottom));
+      display: block; position: absolute; top: auto; bottom: calc(204px + var(--safe-bottom));
       left: calc(10px + var(--safe-left)); right: calc(10px + var(--safe-right)); width: auto;
-      max-height: 46vh; z-index: 4;
+      max-height: calc(46vh / var(--ui-scale, 1)); z-index: 4;
     }
   }
   @media (max-width: 700px) and (orientation: portrait) {
@@ -196,14 +199,17 @@
   }
   @media (max-height: 500px) and (orientation: landscape) {
     /* tray bottom-left, peg mirror bottom-right: separate regions, no overlap */
-    #action-tray { left: calc(10px + var(--safe-left)); right: auto; max-width: 42vw; justify-content: flex-start; }
-    #a11y-board { bottom: calc(8px + var(--safe-bottom)); left: auto; right: calc(10px + var(--safe-right)); transform: none; max-width: 54vw; }
+    #action-tray { left: calc(10px + var(--safe-left)); right: auto; max-width: calc(42vw / var(--ui-scale, 1)); justify-content: flex-start; }
+    #a11y-board { bottom: calc(8px + var(--safe-bottom)); left: auto; right: calc(10px + var(--safe-right)); transform: none; max-width: calc(54vw / var(--ui-scale, 1)); }
     .rail { top: calc(52px + var(--safe-top)); bottom: calc(76px + var(--safe-bottom)); width: 200px; }
+    .rail.drawer-open { bottom: calc(140px + var(--safe-bottom)); }
+    #caption-line { bottom: calc(108px + var(--safe-bottom)); }
   }
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
   }
 </style>
+<script src="ui-scale.js"></script>
 <script src="browser-guard.js"></script>
 <script src="starhermit-sdk.js"></script>
 </head>

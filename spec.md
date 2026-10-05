@@ -256,12 +256,17 @@ right mode/connection/top scores/achievements. Board mirror centred above the tr
 capped at 70 characters. The rails are hidden outside `play`, so menu screens show the backdrop, not
 empty headings.
 
-**Portrait mobile.** Rails collapse; `☰` and `Panel` open them as bottom drawers capped at 46 vh. The
+**Portrait mobile.** Rails collapse; `☰` and `Panel` open them as bottom drawers capped at 46 vh that end above the mirror and caption line. The
 mirror scrolls horizontally if the peg count exceeds the width, with 44×52 px minimum buttons. The tray
 sits in the thumb zone.
 
 **Landscape mobile (≤500 px tall).** The mirror moves to the bottom-right, clear of the tray; the rails
 shrink to 200 px and re-anchor to the shorter viewport.
+
+**Large screens.** Above 1600×1000, `ui-scale.js` sets `--ui-scale` (`min(w/1600, h/1000)`, max 2.5)
+and each UI layer — HUD, rails, tray, mirror, overlays, caption, toast, FPS meter — zooms by it, so the
+layout matches 1600×1000 magnified; the canvas and backdrop are not zoomed, and vw/vh lengths inside
+the UI are divided by the scale.
 
 **Safe areas.** Every fixed edge uses `env(safe-area-inset-*)`; the viewport is `viewport-fit=cover`.
 Nothing that can be cut off is load-bearing: objective, moves/score, pause, the mirror and the tray are
@@ -376,7 +381,7 @@ a failed fetch degrades to a tone rather than silence. `sfx/manifest.txt` is the
 | `achievement` | `achievement-unlock.opus` | Two-bell fanfare with a felt mallet hit | An achievement is granted (voice bus) |
 
 **Captions.** Every `playEvent` emits a caption string through `audio.onCaption`, shown for 2.2 s above
-the board mirror — including while muted, so the cue survives a silent session.
+the board mirror (and above any open overlay) — including while muted, so the cue survives a silent session.
 
 ---
 
