@@ -248,7 +248,7 @@ compat`. `play` is not an overlay — it is the HUD, the tray, the rails and the
 
 `Escape` backs out of whichever overlay is open (help → its return screen, settings → pause or title,
 modes/setup → title, compat → play or title) with the softer `back` cue, and pauses during a round.
-Opening an overlay moves focus to its first button.
+Opening an overlay moves focus to its first button without scrolling; the overlay opens at its top.
 
 **Desktop (≥1024 px).** Canvas fills the viewport. HUD strip across the top: objective left, moves/score
 centre, drawer and pause right. 240 px rails, left objective/undo/hint/restart/skip and progression,

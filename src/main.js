@@ -119,7 +119,10 @@ function setScreen(name) {
   const overlay = document.querySelector(`[data-screen="${name}"]`);
   if (overlay) {
     const btn = overlay.querySelector('button');
-    if (btn) { lastFocus = btn; btn.focus(); }
+    // preventScroll + scrollTop reset: a focused button low in a tall panel
+    // must not scroll the heading away; every overlay opens at its top.
+    if (btn) { lastFocus = btn; btn.focus({ preventScroll: true }); }
+    for (const n of [overlay, ...overlay.querySelectorAll('*')]) if (n.scrollTop) n.scrollTop = 0;
   } else if (lastFocus && name === 'play') {
     lastFocus = null;
   }
