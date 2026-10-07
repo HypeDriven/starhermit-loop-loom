@@ -125,8 +125,8 @@ async function resolveNickname(userId) {
 }
 
 // ---------------------------------------------------------------------------
-// Leaderboards are server-owned: on-platform they are READ-ONLY. Personal
-// bests stay local and cloud-mirrored.
+// The title rail reads the platform board; personal bests stay local and
+// cloud-mirrored. Finished rounds post through submitScore below.
 // ---------------------------------------------------------------------------
 
 export async function refreshHostedBoard() {
@@ -141,6 +141,20 @@ export async function refreshHostedBoard() {
   return hostedBoard;
 }
 
+// Signed in: post a finished round's total to the high-score board through
+// score-script.js. Resolves { posted, rank }. Standalone: no request.
+export async function submitScore(total) {
+  const sh = SH();
+  if (!sh || !isHosted()) return { posted: false, rank: null };
+  const keys = await sh.submitScores({ 'high-score': total }).catch(() => []);
+  if (keys.indexOf('high-score') < 0) return { posted: false, rank: null };
+  try {
+    const r = await sh.leaderboard('high-score', { pageSize: 100 });
+    const me = (r.items || []).find((i) => i.userId === sh.userId);
+    return { posted: true, rank: me ? me.rank : null };
+  } catch (e) { return { posted: true, rank: null }; }
+}
+
 // Signed in only: round-trip-adjusted GET /api/v1/time sets the Daily's UTC
 // day. Standalone uses the local clock and makes no request.
 export async function syncTime() {
@@ -153,5 +167,5 @@ export default {
   getGameScope, getNickname, fetchProfile, getSyncStatus, onAuth, onPlatformHost,
   canSignIn, signIn, inviteLink, loadBindings,
   loadSettings, primeSettings, pushSettings, flushSettings,
-  cloudLoad, cloudSave, flushCloudSave, getHostedBoard, refreshHostedBoard, syncTime,
+  cloudLoad, cloudSave, flushCloudSave, getHostedBoard, refreshHostedBoard, syncTime, submitScore,
 };

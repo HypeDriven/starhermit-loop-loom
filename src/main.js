@@ -509,7 +509,7 @@ function endRound(reason) {
   for (const id of unlocked) {
     audio.playEvent('achievement');
   }
-  // Score boards: local records; platform leaderboards are read-only.
+  // Score boards: local records (signed in, showResults also posts to the platform board).
   const entry = Object.assign({}, r, {
     contentId: current.record.id, seed: current.record.seed,
     version: current.record.version, day: current.record.day,
@@ -556,10 +556,27 @@ function showResults(unlocked, reason) {
     next.textContent = 'Play again';
     next.onclick = () => startRound(current.record, current.mode);
   }
+  postToLeaderboard(r.total);
   transition('results', 'round ended: ' + reason);
   setScreen('results');
   announce((r.solved ? 'Loom complete. ' : 'Round over. ') + 'Total score ' + r.total + '.');
   refreshProgressRail();
+}
+
+// Signed in: Journey, Daily, Challenge and Score Chase rounds post their total
+// to the platform high-score board and the results show the rank. Practice,
+// lessons and standalone play post nothing.
+function postToLeaderboard(total) {
+  const line = $('result-lb');
+  const ranked = ['journey', 'daily', 'challenge', 'chase'].includes(current.mode);
+  if (!platform.isHosted() || !ranked) { line.hidden = true; return; }
+  line.hidden = false;
+  line.textContent = shT.lbPosting;
+  platform.submitScore(total).then((res) => {
+    line.textContent = !res.posted ? shT.lbNotPosted
+      : res.rank ? shT.lbRank.replace('{rank}', res.rank) : shT.lbPosted;
+    platform.refreshHostedBoard().then(() => refreshTitle()).catch(() => {});
+  });
 }
 
 function showTutorialStep() {

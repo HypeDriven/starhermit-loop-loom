@@ -109,6 +109,7 @@ test('standalone: no token means zero platform fetches', async () => {
   assert.deepEqual(await p.loadSettings(), {});
   assert.deepEqual(await p.loadBindings({ hint: ['KeyH'] }), { hint: ['KeyH'] });
   assert.equal(await p.refreshHostedBoard(), null);
+  assert.deepEqual(await p.submitScore(1200), { posted: false, rank: null });
   p.cloudSave({ a: 1 });
   p.primeSettings({});
   p.pushSettings({ haptics: false });

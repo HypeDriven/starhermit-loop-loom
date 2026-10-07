@@ -33,9 +33,10 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 | `src/gfx-i18n.js` | Graphics panel strings in the nine locales and the `navigator.language` locale picker |
 | `src/audio.js` | WebAudio buses, authored clip playback with procedural fallback, ambience, adaptive music, captions |
 | `starhermit-sdk.js` | Shared StarHermit client (unmodified copy, loaded by `index.html`) |
-| `src/platform.js` | Adapter over the SDK: handshake, sign-in/invite, nickname, cloud-save mirror, settings KV, key bindings, read-only leaderboard; dev-server routes off-platform only |
+| `src/platform.js` | Adapter over the SDK: handshake, sign-in/invite, nickname, cloud-save mirror, settings KV, key bindings, leaderboard read + `submitScore`; dev-server routes off-platform only |
 | `src/sh-strings.js` | Account strings in the nine locales |
 | `src/server-time.js` | UTC day number the Daily uses; round-trip-corrected `GET /api/v1/time` when signed in, local clock standalone |
+| `score-script.js` | StarHermit platform script (`server=score-script.js`): range-checks a finished round's total sent through `StarHermit.submitScores` and posts it to the `high-score` leaderboard (canonical copy in the games repo's `tools/score-script.js`) |
 | `server.js` | Local-dev backend: static host + API (time, daily, replay-validated scores, achievements, presence); the client no longer calls these routes |
 | `tests/rules.test.js` `tests/content.test.js` `tests/session.test.js` `tests/gfx.test.js` `tests/platform.test.js` | `node --test` unit/property/golden/graphics-model suites, plus the StarHermit adapter over the real SDK with a stubbed fetch |
 | `tests/e2e.mjs` | Playwright-core playthrough of the real UI at three viewports |
@@ -71,8 +72,9 @@ state that punishes with noise.
 
 **5. Provable runs.** Every round records an ordered command log with periodic state hashes. The seed
 generates the board; the board is BFS-validated for solvability and par before it ever ships.
-Ranked scores are accepted only after `server.js` re-derives the board from the content id and replays
-the log. *Rules out:* client-declared scores, boards sent by the client, and unvalidated daily content.
+`server.js` (local dev) can re-derive the board from the content id and replay the log; the deployed
+platform board takes the client's total with a range check only. *Rules out:* boards sent by the
+client and unvalidated daily content.
 
 ---
 
@@ -427,7 +429,7 @@ fallback).
 
 ## 12. StarHermit integration
 
-`starhermit.txt` declares `name`, `launch=index.html`, `owner`, `server=server.js`, `cover=coverart.png`.
+`starhermit.txt` declares `name`, `launch=index.html`, `owner`, `server=score-script.js`, `cover=coverart.png`. `score-script.js` is the platform script: a practice session that accepts `{type:'result', scores}`, range-checks each score against its board and posts it.
 
 `starhermit.txt` also lists one `control.<action>=<Code>[+<Code>] | <Label>` line per keyboard
 action (left, right, up, down, confirm, cancel, undo, hint, pause, camera).
@@ -455,22 +457,24 @@ the bundle) via `src/platform.js`; without a launch token nothing calls the plat
   list shows the effective keys.
 - **Invite link.** Signed-in players get **Invite a friend** on the title, copying
   `StarHermit.inviteLink()` with a confirmation toast.
-- **Leaderboard (read-only).** The game's first platform board, when one exists, is shown
-  in the rails with names resolved via profiles (`StarHermit.leaderboard()`); personal bests
-  stay local and cloud-mirrored. Achievements stay local (part of the cloud-saved doc).
+- **Leaderboard.** One board, `high-score` (integer, higher is better, 0–100,000). Every
+  finished Journey, Daily, Challenge or Score Chase round (solved or not) posts its total through
+  `platform.submitScore` → `StarHermit.submitScores`, and the results screen shows
+  "Leaderboard rank: #N" (or "Score posted / not posted to the leaderboard."); Practice and
+  lessons post nothing. The board is shown in the rails with names resolved via profiles
+  (`StarHermit.leaderboard()`) and refreshed after each post; personal bests stay local and
+  cloud-mirrored. Achievements stay local (part of the cloud-saved doc).
 
-Account strings are localized in the nine locales (`src/sh-strings.js`). Query-string tokens
+Account and leaderboard strings are localized in the nine locales (`src/sh-strings.js`). Query-string tokens
 (`?game_token=`) remain a local-dev convenience. Signed in, the only own-server route used is
 `GET /api/v1/time` (Daily UTC day). Standalone (no launch token) the client makes no request to
 any `/api` or `/ws` route: local clock, local boards and achievements, no activity, presence,
 score submission or telemetry. The repo's `server.js` still implements those routes but the
 client never calls them.
 
-**Not used.** Platform sessions, real-time multiplayer, matchmaking, parties, chat,
-friend-picker invites, replays, entitlements or purchases, and client score submission to the
-platform-owned leaderboard (`server.js` is a standalone Node host, not a platform game script,
-so it reports no scores, achievements or replays). Loop Loom is solo; the social surfaces are the read-only hosted
-board and asynchronous personal-best comparison. The game is fully playable
+**Not used.** Multiplayer platform sessions, real-time multiplayer, matchmaking, parties, chat,
+friend-picker invites, replays, platform achievements, entitlements or purchases. Loop Loom is
+solo; the social surfaces are the hosted high-score board and asynchronous personal-best comparison. The game is fully playable
 with no network: the status rail reads "Playing locally" and scores live on the local boards.
 
 **Anti-cheat.** `POST /api/v1/scores` never trusts a client board or score. It re-derives the record from
