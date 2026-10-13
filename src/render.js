@@ -942,9 +942,9 @@ function renderFrame(ms) {
     buildPost(w, h);
   }
   if (composer) {
-    try { composer.render(ms / 1000); return; } catch { postFailed = true; composer = null; }
+    try { (globalThis.GameOptions ? globalThis.GameOptions.draw(composer.renderer, () => composer.render(ms / 1000)) : composer.render(ms / 1000)); return; } catch { postFailed = true; composer = null; }
   }
-  renderer.render(scene, camera);
+  (globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, camera)) : renderer.render(scene, camera));
 }
 
 export function setBoard(state) {

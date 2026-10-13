@@ -43,11 +43,11 @@ function ensureCtx() {
   ctx = new AC();
   const master = ctx.createGain();
   master.connect(ctx.destination);
-  buses.master = master;
+  buses.master = (globalThis.GameOptions ? globalThis.GameOptions.tagBus(master, "master") : master);
   for (const name of ['music', 'effects', 'ambience', 'voice']) {
     const g = ctx.createGain();
     g.connect(master);
-    buses[name] = g;
+    buses[name] = (globalThis.GameOptions ? globalThis.GameOptions.tagBus(g, name) : g);
   }
   applyVolumes();
   return ctx;
@@ -98,7 +98,7 @@ function playSfx(name) {
   const buf = sfxCache.get(clip);
   if (buf === undefined) { loadSfx(clip); return false; }
   if (!buf || buf === 'loading') return false;
-  const src = ctx.createBufferSource();
+  const src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(ctx.createBufferSource(), name) : ctx.createBufferSource());
   src.buffer = buf;
   src.connect(buses.effects);
   src.start();
@@ -112,7 +112,7 @@ function blip(bus, freq, dur, type, gain, slide) {
   const c = ensureCtx();
   if (!c) return;
   const t = c.currentTime;
-  const o = c.createOscillator();
+  const o = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(c.createOscillator(), bus) : c.createOscillator());
   const g = c.createGain();
   o.type = type || 'sine';
   o.frequency.setValueAtTime(freq, t);
@@ -132,7 +132,7 @@ function noiseTick(bus, dur, gain, filterFreq) {
   const buf = c.createBuffer(1, len, c.sampleRate);
   const d = buf.getChannelData(0);
   for (let i = 0; i < len; i++) d[i] = (avRng() * 2 - 1) * (1 - i / len);
-  const src = c.createBufferSource();
+  const src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(c.createBufferSource(), bus) : c.createBufferSource());
   src.buffer = buf;
   const f = c.createBiquadFilter();
   f.type = 'bandpass'; f.frequency.value = filterFreq; f.Q.value = 1.2;
@@ -191,7 +191,7 @@ export function startAmbience() {
     const d = buf.getChannelData(0);
     let last = 0;
     for (let i = 0; i < len; i++) { last = last * 0.98 + (avRng() * 2 - 1) * 0.02; d[i] = last * 8; }
-    const src = c.createBufferSource();
+    const src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(c.createBufferSource(), null) : c.createBufferSource());
     src.buffer = buf; src.loop = true;
     const f = c.createBiquadFilter();
     f.type = 'lowpass'; f.frequency.value = 320;
