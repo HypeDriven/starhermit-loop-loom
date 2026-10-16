@@ -41,6 +41,7 @@ export function handshake() {
   initialized = true;
   sh.init();
   sh.on('saved', (ok) => { syncState = ok ? 'synced' : 'offline'; });
+  sh.on('saveconflict', () => { for (const fn of conflictListeners) { try { fn(); } catch { /* listener */ } } });
   sh.on('auth', (a) => {
     if (!a.signedIn) { syncState = 'offline'; hostedBoard = null; }
     for (const fn of authListeners) { try { fn(a); } catch { /* ignore */ } }
@@ -59,6 +60,12 @@ export async function cloudLoad() {
   syncState = 'synced';
   return doc;
 }
+
+// A conditional cloud write was refused because another device saved first.
+const conflictListeners = new Set();
+export function onConflict(fn) { conflictListeners.add(fn); return () => conflictListeners.delete(fn); }
+/** True when the last cloud read failed or is stale (writes stay blocked). */
+export function cloudReadFailed() { const sh = SH(); return !!(sh && (sh.saveLoadFailed() || sh.saveConflicted())); }
 
 export function cloudSave(doc) {
   if (!isHosted() || !doc) return;
@@ -167,5 +174,5 @@ export default {
   getGameScope, getNickname, fetchProfile, getSyncStatus, onAuth, onPlatformHost,
   canSignIn, signIn, inviteLink, loadBindings,
   loadSettings, primeSettings, pushSettings, flushSettings,
-  cloudLoad, cloudSave, flushCloudSave, getHostedBoard, refreshHostedBoard, syncTime, submitScore,
+  cloudLoad, cloudSave, flushCloudSave, onConflict, cloudReadFailed, getHostedBoard, refreshHostedBoard, syncTime, submitScore,
 };

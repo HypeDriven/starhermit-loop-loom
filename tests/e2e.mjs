@@ -20,6 +20,7 @@
  * Run: npm run test:e2e
  */
 import { chromium } from 'playwright-core';
+import { launchToken, stubStarHermit } from './starhermit-e2e.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -140,7 +141,8 @@ async function runPass(tag, contextOpts) {
   const page = await context.newPage();
   const errors = [];
   // Standalone (no launch token) must not touch any own-server route.
-  page.on('request', (r) => { const u = new URL(r.url()); if (/^https?:$/.test(u.protocol) && /^\/(api|ws)(\/|$)/.test(u.pathname)) errors.push(`standalone requested ${r.method()} ${u.pathname}`); });
+  const onRequest = (r) => { const u = new URL(r.url()); if (/^https?:$/.test(u.protocol) && /^\/(api|ws)(\/|$)/.test(u.pathname)) errors.push(`standalone requested ${r.method()} ${u.pathname}`); };
+  page.on('request', onRequest);
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
     if (m.type() !== 'error' && m.type() !== 'warning') return;
@@ -327,6 +329,87 @@ async function runPass(tag, contextOpts) {
       await page.click('#btn-results-title');
       await overlay('title').waitFor();
       await page.screenshot({ path: SHOT('title-after', tag) });
+    });
+
+    await step('language: Automatic follows the StarHermit preferred language (fr-CA); Deutsch re-renders and saves ui.language; report a problem', async () => {
+      page.off('request', onRequest); // standalone checks are done; this step is signed in
+      const calls = await stubStarHermit(page, { preferredLanguage: 'fr-CA' });
+      await page.goto('about:blank');
+      await page.goto(`http://127.0.0.1:${port}/index.html#game_token=${launchToken()}`, { waitUntil: 'load' });
+      await page.waitForFunction(() => document.documentElement.lang === 'fr-CA', null, { timeout: 15000 });
+      await overlay('title').waitFor({ timeout: 15000 });
+      if ((await page.textContent('#btn-play')) !== 'Jouer') throw new Error('title not in fr-CA');
+      await page.click('#btn-title-settings');
+      await overlay('settings').waitFor();
+      const choice = page.locator('[data-game-language="choice"]');
+      if ((await choice.count()) !== 1) throw new Error('expected exactly one Language select');
+      await choice.scrollIntoViewIfNeeded();
+      const auto = await choice.locator('option').first().textContent();
+      if (auto !== 'Automatique — Français (Canada)') throw new Error('Automatic label: ' + auto);
+      await page.evaluate(() => { document.querySelector('[data-game-language="choice"]').__kept = true; });
+      await choice.selectOption('de-DE');
+      await page.waitForFunction(() => document.documentElement.lang === 'de-DE');
+      await page.waitForFunction(() => /Im Konto gespeichert/.test(document.querySelector('[data-game-language="status"]').textContent), null, { timeout: 5000 });
+      if (calls.settings['ui.language']?.choice !== 'de-DE') throw new Error('ui.language not saved: ' + JSON.stringify(calls.settings));
+      const de = await page.evaluate(() => ({
+        h: document.getElementById('settings-h').textContent,
+        gfx: document.getElementById('gfx-heading').textContent,
+        music: document.querySelector('label[for="set-music"]').textContent,
+        done: document.getElementById('btn-settings-close').textContent,
+        kept: document.querySelector('[data-game-language="choice"]').__kept === true,
+      }));
+      if (de.h !== 'Einstellungen' || de.gfx !== 'Grafik' || de.music !== 'Musik' || de.done !== 'Fertig' || !de.kept) throw new Error('settings not re-rendered in place: ' + JSON.stringify(de));
+      await page.locator('[data-game-report="title"]').scrollIntoViewIfNeeded();
+      await page.fill('[data-game-report="title"]', 'Language test report');
+      await page.click('[data-game-report="send"]');
+      await page.waitForFunction(() => /Danke/.test(document.querySelector('[data-game-report="status"]').textContent), null, { timeout: 5000 });
+      if (!calls.reports?.[0] || calls.reports[0].kind !== 'bug') throw new Error('report not posted');
+      if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw new Error('German settings overflow horizontally');
+      await page.screenshot({ path: SHOT('language-de', tag), fullPage: true });
+      await page.click('#btn-settings-close');
+      await overlay('title').waitFor();
+      if ((await page.textContent('#btn-modes')) !== 'Modi & Fortschritt') throw new Error('title not German');
+    });
+
+    await step('language: switching mid-round re-renders the HUD, board labels and pause menu and keeps the round', async () => {
+      await page.click('#btn-play');
+      await overlay('setup').waitFor();
+      if ((await page.textContent('#btn-start-round')) !== 'Runde starten') throw new Error('setup not German');
+      await page.click('#btn-start-round');
+      await playVisible();
+      await page.locator('#a11y-board .peg-btn').first().waitFor({ state: 'visible' });
+      const glyphs = () => page.evaluate(() => [...document.querySelectorAll('#a11y-board .peg-btn')].map((b) => b.innerHTML).join('|'));
+      const before = await glyphs();
+      await page.click('#btn-pause');
+      await overlay('pause').waitFor();
+      await page.click('#btn-open-settings');
+      await overlay('settings').waitFor();
+      const choice = page.locator('[data-game-language="choice"]');
+      await choice.scrollIntoViewIfNeeded();
+      await choice.selectOption('it-IT');
+      await page.waitForFunction(() => document.documentElement.lang === 'it-IT');
+      await page.click('#btn-settings-close');
+      await overlay('pause').waitFor();
+      if ((await page.textContent('#pause-h')) !== 'In pausa') throw new Error('pause menu not Italian');
+      await page.click('#btn-resume');
+      await playVisible();
+      const it = await page.evaluate(() => ({
+        status: document.getElementById('hud-status').textContent,
+        peg: document.querySelector('#a11y-board .peg-btn').getAttribute('aria-label'),
+        undo: document.getElementById('tray-undo').textContent,
+      }));
+      if (!/^Mosse \d+/.test(it.status) || !/^Piolo 1: /.test(it.peg) || it.undo !== 'Annulla') throw new Error('round not re-rendered: ' + JSON.stringify(it));
+      if (await glyphs() !== before) throw new Error('the round changed during the language switch');
+      await page.screenshot({ path: SHOT('language-it-play', tag) });
+      await page.click('#btn-pause');
+      await page.click('#btn-open-settings');
+      await choice.scrollIntoViewIfNeeded();
+      await choice.selectOption('auto');
+      await page.waitForFunction(() => document.documentElement.lang === 'fr-CA');
+      await page.click('#btn-settings-close');
+      await page.click('#btn-leave');
+      await overlay('title').waitFor();
+      await page.unroute(/\/api\/v1\//);
     });
   } finally {
     if (errors.length) {

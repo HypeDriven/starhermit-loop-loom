@@ -212,11 +212,12 @@
 <script src="game-options.js" data-game="loop-loom"></script>
 <script src="ui-scale.js"></script>
 <script src="browser-guard.js"></script>
+<script src="sh-language.js"></script>
 <script src="starhermit-sdk.js"></script>
 </head>
 <body>
 <div id="app">
-  <canvas id="game-canvas" aria-label="Loop Loom playfield" role="img"></canvas>
+  <canvas id="game-canvas" aria-label="Loop Loom playfield" data-i18n-aria="Loop Loom playfield" role="img"></canvas>
   <div id="backdrop" aria-hidden="true"></div>
 
   <!-- Play HUD: objective, progress, state, pause -->
@@ -224,50 +225,50 @@
     <div class="hud-card" id="hud-objective">Objective: make every peg uniform.</div>
     <div class="hud-card" id="hud-status">Moves 0 · Score 0</div>
     <div style="display:flex;gap:8px">
-      <button id="btn-drawer-left" class="secondary" aria-label="Open objective panel">☰</button>
-      <button id="btn-pause" class="secondary" aria-label="Pause game">❚❚</button>
+      <button id="btn-drawer-left" class="secondary" aria-label="Open objective panel" data-i18n-aria="Open objective panel">☰</button>
+      <button id="btn-pause" class="secondary" aria-label="Pause game" data-i18n-aria="Pause game">❚❚</button>
     </div>
   </div>
 
   <!-- Left rail: objective / progression -->
-  <aside class="rail" id="rail-left" aria-label="Objective and progression">
-    <h2>Objective</h2>
+  <aside class="rail" id="rail-left" aria-label="Objective and progression" data-i18n-aria="Objective and progression">
+    <h2 data-i18n="Objective">Objective</h2>
     <p id="rail-objective">Move loops between pegs until every peg holds one color.</p>
     <p id="rail-progress"></p>
     <div class="row">
-      <button id="btn-undo" class="secondary" type="button">Undo</button>
-      <button id="btn-hint" class="secondary" type="button">Hint</button>
+      <button id="btn-undo" class="secondary" type="button" data-i18n="Undo">Undo</button>
+      <button id="btn-hint" class="secondary" type="button" data-i18n="Hint">Hint</button>
     </div>
     <div class="row">
-      <button id="btn-restart" class="secondary" type="button">Restart</button>
-      <button id="btn-settle" class="secondary" type="button">Skip anim</button>
+      <button id="btn-restart" class="secondary" type="button" data-i18n="Restart">Restart</button>
+      <button id="btn-settle" class="secondary" type="button" data-i18n="Skip anim">Skip anim</button>
     </div>
-    <h2>Progression</h2>
+    <h2 data-i18n="Progression">Progression</h2>
     <p id="rail-journey"></p>
   </aside>
 
   <!-- Right rail: contextual actions + social/status -->
-  <aside class="rail" id="rail-right" aria-label="Status and scores">
-    <h2>Status</h2>
+  <aside class="rail" id="rail-right" aria-label="Status and scores" data-i18n-aria="Status and scores">
+    <h2 data-i18n="Status">Status</h2>
     <p id="rail-mode"></p>
     <p id="rail-online"></p>
-    <h2>Top scores</h2>
+    <h2 data-i18n="Top scores">Top scores</h2>
     <ul id="rail-scores"></ul>
-    <h2>Achievements</h2>
+    <h2 data-i18n="Achievements">Achievements</h2>
     <ul id="rail-achievements"></ul>
   </aside>
 
   <!-- Bottom thumb-zone action tray -->
   <div id="action-tray" class="hidden">
-    <button id="tray-undo" class="secondary">Undo</button>
-    <button id="tray-hint" class="secondary">Hint</button>
-    <button id="tray-help" class="secondary">Help</button>
-    <button id="tray-panel" class="secondary">Panel</button>
-    <button id="tray-camera" class="secondary" title="Reset view (R)">View</button>
+    <button id="tray-undo" class="secondary" data-i18n="Undo">Undo</button>
+    <button id="tray-hint" class="secondary" data-i18n="Hint">Hint</button>
+    <button id="tray-help" class="secondary" data-i18n="Help">Help</button>
+    <button id="tray-panel" class="secondary" data-i18n="Panel">Panel</button>
+    <button id="tray-camera" class="secondary" title="Reset view (R)" data-i18n-title="Reset view (R)" data-i18n="View">View</button>
   </div>
 
   <!-- Accessible board mirror -->
-  <div id="a11y-board" role="group" aria-label="Pegs"></div>
+  <div id="a11y-board" role="group" aria-label="Pegs" data-i18n-aria="Pegs"></div>
   <div id="live-region" aria-live="polite"></div>
   <div id="caption-line" class="hidden"></div>
   <div id="toast" class="hidden" role="status"></div>
@@ -275,13 +276,13 @@
   <!-- Title / home -->
   <section class="overlay" data-screen="title" aria-labelledby="title-h">
     <h1 id="title-h">Loop Loom</h1>
-    <p>A textile atelier of colored loops and brass pegs.<br/>Move loops between pegs — keeping their stack order — until every peg is one color.</p>
+    <p><span data-i18n="A textile atelier of colored loops and brass pegs.">A textile atelier of colored loops and brass pegs.</span><br/><span data-i18n="Move loops between pegs — keeping their stack order — until every peg is one color.">Move loops between pegs — keeping their stack order — until every peg is one color.</span></p>
     <div class="col">
-      <button id="btn-play" type="button">Play</button>
-      <button id="btn-resume-saved" class="secondary hidden" type="button">Resume saved round</button>
-      <button id="btn-modes" class="secondary" type="button">Modes &amp; progress</button>
-      <button id="btn-help-title" class="secondary" type="button">How to play</button>
-      <button id="btn-title-settings" class="secondary" type="button">Settings</button>
+      <button id="btn-play" type="button" data-i18n="Play">Play</button>
+      <button id="btn-resume-saved" class="secondary hidden" type="button" data-i18n="Resume saved round">Resume saved round</button>
+      <button id="btn-modes" class="secondary" type="button" data-i18n="Modes &amp; progress">Modes &amp; progress</button>
+      <button id="btn-help-title" class="secondary" type="button" data-i18n="How to play">How to play</button>
+      <button id="btn-title-settings" class="secondary" type="button" data-i18n="Settings">Settings</button>
       <button id="btn-signin" class="secondary hidden" type="button">Sign in with StarHermit</button>
       <button id="btn-invite" class="secondary hidden" type="button">Invite a friend</button>
     </div>
@@ -290,15 +291,15 @@
 
   <!-- Mode select -->
   <section class="overlay hidden" data-screen="modes" aria-labelledby="modes-h">
-    <h1 id="modes-h">Choose a mode</h1>
+    <h1 id="modes-h" data-i18n="Choose a mode">Choose a mode</h1>
     <div class="col">
-      <button id="mode-learn" class="secondary" type="button">Learn — interactive lessons</button>
-      <button id="mode-journey" class="secondary" type="button">Journey — 48 stages</button>
-      <button id="mode-daily" class="secondary" type="button">Daily — one shared loom per UTC day</button>
-      <button id="mode-practice" class="secondary" type="button">Practice — unranked, undo allowed</button>
-      <button id="mode-challenge" class="secondary" type="button">Challenge — constrained goals</button>
-      <button id="mode-chase" class="secondary" type="button">Score chase — leaderboards</button>
-      <button id="mode-back" class="ghost" type="button">Back</button>
+      <button id="mode-learn" class="secondary" type="button" data-i18n="Learn — interactive lessons">Learn — interactive lessons</button>
+      <button id="mode-journey" class="secondary" type="button" data-i18n="Journey — 48 stages">Journey — 48 stages</button>
+      <button id="mode-daily" class="secondary" type="button" data-i18n="Daily — one shared loom per UTC day">Daily — one shared loom per UTC day</button>
+      <button id="mode-practice" class="secondary" type="button" data-i18n="Practice — unranked, undo allowed">Practice — unranked, undo allowed</button>
+      <button id="mode-challenge" class="secondary" type="button" data-i18n="Challenge — constrained goals">Challenge — constrained goals</button>
+      <button id="mode-chase" class="secondary" type="button" data-i18n="Score chase — leaderboards">Score chase — leaderboards</button>
+      <button id="mode-back" class="ghost" type="button" data-i18n="Back">Back</button>
     </div>
   </section>
 
@@ -309,65 +310,65 @@
     <p id="setup-meta" style="font-size:13px;color:var(--dim)"></p>
     <div id="setup-extra"></div>
     <div class="col">
-      <button id="btn-start-round" type="button">Start round</button>
-      <button id="btn-back-title" class="ghost" type="button">Back</button>
+      <button id="btn-start-round" type="button" data-i18n="Start round">Start round</button>
+      <button id="btn-back-title" class="ghost" type="button" data-i18n="Back">Back</button>
     </div>
   </section>
 
   <!-- Pause -->
   <section class="overlay hidden" data-screen="pause" aria-labelledby="pause-h">
-    <h1 id="pause-h">Paused</h1>
+    <h1 id="pause-h" data-i18n="Paused">Paused</h1>
     <div class="col">
-      <button id="btn-resume" type="button">Resume</button>
-      <button id="btn-open-settings" class="secondary" type="button">Settings</button>
-      <button id="btn-help-pause" class="secondary" type="button">Help</button>
-      <button id="btn-leave" class="ghost" type="button">Leave to title</button>
+      <button id="btn-resume" type="button" data-i18n="Resume">Resume</button>
+      <button id="btn-open-settings" class="secondary" type="button" data-i18n="Settings">Settings</button>
+      <button id="btn-help-pause" class="secondary" type="button" data-i18n="Help">Help</button>
+      <button id="btn-leave" class="ghost" type="button" data-i18n="Leave to title">Leave to title</button>
     </div>
   </section>
 
   <!-- Settings -->
   <section class="overlay hidden" data-screen="settings" aria-labelledby="settings-h">
-    <h1 id="settings-h">Settings</h1>
-    <h2>Audio</h2>
-    <div class="settings-row"><label for="set-music">Music</label><input id="set-music" type="range" min="0" max="1" step="0.05"/></div>
-    <div class="settings-row"><label for="set-effects">Effects</label><input id="set-effects" type="range" min="0" max="1" step="0.05"/></div>
-    <div class="settings-row"><label for="set-ambience">Ambience</label><input id="set-ambience" type="range" min="0" max="1" step="0.05"/></div>
-    <div class="settings-row"><label for="set-voice">Voice cues</label><input id="set-voice" type="range" min="0" max="1" step="0.05"/></div>
-    <div class="settings-row"><label for="set-muted">Mute all</label><input id="set-muted" type="checkbox"/></div>
+    <h1 id="settings-h" data-i18n="Settings">Settings</h1>
+    <h2 data-i18n="Audio">Audio</h2>
+    <div class="settings-row"><label for="set-music" data-i18n="Music">Music</label><input id="set-music" type="range" min="0" max="1" step="0.05"/></div>
+    <div class="settings-row"><label for="set-effects" data-i18n="Effects">Effects</label><input id="set-effects" type="range" min="0" max="1" step="0.05"/></div>
+    <div class="settings-row"><label for="set-ambience" data-i18n="Ambience">Ambience</label><input id="set-ambience" type="range" min="0" max="1" step="0.05"/></div>
+    <div class="settings-row"><label for="set-voice" data-i18n="Voice cues">Voice cues</label><input id="set-voice" type="range" min="0" max="1" step="0.05"/></div>
+    <div class="settings-row"><label for="set-muted" data-i18n="Mute all">Mute all</label><input id="set-muted" type="checkbox"/></div>
     <h2 id="gfx-heading">Graphics</h2>
-    <div id="gfx-section" data-gfx-panel>
-      <div class="settings-row"><label for="set-quality" data-i18n="quality">Quality</label>
+    <div id="gfx-section" data-gfx-panel data-options-graphics>
+      <div class="settings-row"><label for="set-quality" data-gfx-i18n="quality">Quality</label>
         <select id="set-quality" data-gfx="preset">
           <option value="auto">Auto</option><option value="low">Low</option><option value="balanced">Balanced</option>
           <option value="high">High</option><option value="ultra">Ultra</option>
         </select></div>
-      <div class="settings-row"><label for="gfx-scale" data-i18n="renderScale">Render scale</label>
+      <div class="settings-row"><label for="gfx-scale" data-gfx-i18n="renderScale">Render scale</label>
         <span class="gfx-range"><input id="gfx-scale" data-gfx="render_scale" type="range" min="50" max="200" step="5" value="100"/><output id="gfx-scale-value" for="gfx-scale">100%</output></span></div>
       <div id="gfx-cats"></div>
-      <div class="settings-row"><label for="gfx-adaptive" data-i18n="adaptive">Adaptive resolution</label><input id="gfx-adaptive" data-gfx="adaptive" type="checkbox"/></div>
-      <div class="settings-row"><label for="gfx-fps" data-i18n="showFps">Show frame rate</label><input id="gfx-fps" data-gfx="show_fps" type="checkbox"/></div>
+      <div class="settings-row"><label for="gfx-adaptive" data-gfx-i18n="adaptive">Adaptive resolution</label><input id="gfx-adaptive" data-gfx="adaptive" type="checkbox"/></div>
+      <div class="settings-row"><label for="gfx-fps" data-gfx-i18n="showFps">Show frame rate</label><input id="gfx-fps" data-gfx="show_fps" type="checkbox"/></div>
       <p id="gfx-summary" class="gfx-summary" aria-live="polite"></p>
       <p id="gfx-note" class="gfx-summary gfx-note hidden" role="note"></p>
     </div>
-    <div class="settings-row"><label for="set-motion">Reduced motion</label><input id="set-motion" type="checkbox"/></div>
-    <h2>Accessibility</h2>
-    <div class="settings-row"><label for="set-palette">Color palette</label>
+    <div class="settings-row"><label for="set-motion" data-i18n="Reduced motion">Reduced motion</label><input id="set-motion" type="checkbox"/></div>
+    <h2 data-i18n="Accessibility">Accessibility</h2>
+    <div class="settings-row"><label for="set-palette" data-i18n="Color palette">Color palette</label>
       <select id="set-palette">
-        <option value="default">Default</option><option value="deuteranopia">Deuteranopia-safe</option>
-        <option value="protanopia">Protanopia-safe</option><option value="tritanopia">Tritanopia-safe</option>
-        <option value="contrast">High contrast</option>
+        <option value="default" data-i18n="Default">Default</option><option value="deuteranopia" data-i18n="Deuteranopia-safe">Deuteranopia-safe</option>
+        <option value="protanopia" data-i18n="Protanopia-safe">Protanopia-safe</option><option value="tritanopia" data-i18n="Tritanopia-safe">Tritanopia-safe</option>
+        <option value="contrast" data-i18n="High contrast">High contrast</option>
       </select></div>
-    <div class="settings-row"><label for="set-contrast">High contrast UI</label><input id="set-contrast" type="checkbox"/></div>
-    <div class="settings-row"><label for="set-text">Larger text</label><input id="set-text" type="checkbox"/></div>
-    <div class="settings-row"><label for="set-left">Left-handed controls</label><input id="set-left" type="checkbox"/></div>
-    <div class="settings-row"><label for="set-hold">Hold to lift (vs tap)</label><input id="set-hold" type="checkbox"/></div>
-    <div class="settings-row"><label for="set-timing">Timing assistance</label><input id="set-timing" type="checkbox"/></div>
-    <div class="settings-row"><label for="set-haptics">Haptics</label><input id="set-haptics" type="checkbox"/></div>
-    <h2>Privacy</h2>
-    <div class="settings-row"><label for="set-telemetry">Share anonymous usage counters</label><input id="set-telemetry" type="checkbox"/></div>
+    <div class="settings-row"><label for="set-contrast" data-i18n="High contrast UI">High contrast UI</label><input id="set-contrast" type="checkbox"/></div>
+    <div class="settings-row"><label for="set-text" data-i18n="Larger text">Larger text</label><input id="set-text" type="checkbox"/></div>
+    <div class="settings-row"><label for="set-left" data-i18n="Left-handed controls">Left-handed controls</label><input id="set-left" type="checkbox"/></div>
+    <div class="settings-row"><label for="set-hold" data-i18n="Hold to lift (vs tap)">Hold to lift (vs tap)</label><input id="set-hold" type="checkbox"/></div>
+    <div class="settings-row"><label for="set-timing" data-i18n="Timing assistance">Timing assistance</label><input id="set-timing" type="checkbox"/></div>
+    <div class="settings-row"><label for="set-haptics" data-i18n="Haptics">Haptics</label><input id="set-haptics" type="checkbox"/></div>
+    <h2 data-i18n="Privacy">Privacy</h2>
+    <div class="settings-row"><label for="set-telemetry" data-i18n="Share anonymous usage counters">Share anonymous usage counters</label><input id="set-telemetry" type="checkbox"/></div>
     <div class="col">
-      <button id="btn-replay-tutorial" class="secondary" type="button">Replay tutorial</button>
-      <button id="btn-settings-close" type="button">Done</button>
+      <button id="btn-replay-tutorial" class="secondary" type="button" data-i18n="Replay tutorial">Replay tutorial</button>
+      <button id="btn-settings-close" type="button" data-i18n="Done">Done</button>
     </div>
   </section>
 
@@ -380,28 +381,28 @@
     <p id="result-lb" style="font-size:13px" aria-live="polite" hidden></p>
     <div class="col">
       <button id="btn-next" type="button">Next</button>
-      <button id="btn-retry" class="secondary" type="button">Retry</button>
-      <button id="btn-results-title" class="ghost" type="button">Title</button>
+      <button id="btn-retry" class="secondary" type="button" data-i18n="Retry">Retry</button>
+      <button id="btn-results-title" class="ghost" type="button" data-i18n="Title">Title</button>
     </div>
   </section>
 
   <!-- Help -->
   <section class="overlay hidden" data-screen="help" aria-labelledby="help-h">
-    <h1 id="help-h">How to play</h1>
+    <h1 id="help-h" data-i18n="How to play">How to play</h1>
     <div id="help-text" style="text-align:left"></div>
-    <div class="col"><button id="btn-help-close" type="button">Close</button></div>
+    <div class="col"><button id="btn-help-close" type="button" data-i18n="Close">Close</button></div>
   </section>
 
   <!-- Compatibility -->
   <section class="overlay hidden" data-screen="compat" aria-labelledby="compat-h">
-    <h1 id="compat-h">3D unavailable</h1>
-    <p>This device or browser could not create a WebGL context. Your progress and settings are preserved. You can still play with the accessible board below.</p>
-    <div class="col"><button id="btn-compat-close" type="button">Continue in 2D</button></div>
+    <h1 id="compat-h" data-i18n="3D unavailable">3D unavailable</h1>
+    <p data-i18n="This device or browser could not create a WebGL context. Your progress and settings are preserved. You can still play with the accessible board below.">This device or browser could not create a WebGL context. Your progress and settings are preserved. You can still play with the accessible board below.</p>
+    <div class="col"><button id="btn-compat-close" type="button" data-i18n="Continue in 2D">Continue in 2D</button></div>
   </section>
 
   <!-- Loading -->
-  <div class="overlay hidden" data-screen="loading" role="status"><h1>Loading…</h1><p id="loading-detail">Preparing the atelier.</p></div>
+  <div class="overlay hidden" data-screen="loading" role="status"><h1 data-i18n="Loading…">Loading…</h1><p id="loading-detail" data-i18n="Preparing the atelier.">Preparing the atelier.</p></div>
 </div>
-<script type="module" src="./lib/bundle.js?v=review-2"></script>
+<script type="module" src="./lib/bundle.js?v=language-1"></script>
 </body>
 </html>

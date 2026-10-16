@@ -311,6 +311,48 @@ export function exportDoc() {
   };
 }
 
+// Another device saved since this one last loaded the slot: keep everything
+// either side earned — journey unlock and completions, lessons, daily days,
+// achievements (earliest time), round count, best scores, and both score
+// tables (de-duplicated by session) — and this device's settings.
+export function mergeDocs(remote, local) {
+  const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+  const data = (doc) => {
+    const p = obj(doc).progress;
+    return p && p.version === 1 && p.data && p.sum === checksum(p.data) ? p.data : {};
+  };
+  const a = data(remote), b = data(local);
+  const maxMap = (x, y) => { const o = { ...obj(x) }; for (const [k, v] of Object.entries(obj(y))) o[k] = Math.max(Number(o[k]) || 0, Number(v) || 0); return o; };
+  const earliest = (x, y) => { const o = { ...obj(x) }; for (const [k, v] of Object.entries(obj(y))) o[k] = o[k] && o[k] < v ? o[k] : v; return o; };
+  const merged = {
+    ...a, ...b, version: 1,
+    journeyUnlocked: Math.max(Number(a.journeyUnlocked) || 0, Number(b.journeyUnlocked) || 0),
+    journeyDone: { ...obj(a.journeyDone), ...obj(b.journeyDone) },
+    lessonsDone: { ...obj(a.lessonsDone), ...obj(b.lessonsDone) },
+    dailyDays: [...new Set([...(Array.isArray(a.dailyDays) ? a.dailyDays : []), ...(Array.isArray(b.dailyDays) ? b.dailyDays : [])])],
+    achievements: earliest(a.achievements, b.achievements),
+    roundsCompleted: Math.max(Number(a.roundsCompleted) || 0, Number(b.roundsCompleted) || 0),
+    bestScores: maxMap(a.bestScores, b.bestScores),
+  };
+  const ra = obj(obj(remote).scores), la = obj(obj(local).scores);
+  const uniq = (list) => { const seen = new Set(); return list.filter((e) => { const k = e && (e.sessionId + ':' + e.at); if (!e || seen.has(k)) return false; seen.add(k); return true; }); };
+  const global = uniq([...(Array.isArray(ra.global) ? ra.global : []), ...(Array.isArray(la.global) ? la.global : [])])
+    .sort((x, y) => rules.compareResults(
+      { total: x.score, solved: true, invalid: x.invalid, elapsedMs: x.elapsedMs, sessionId: x.sessionId },
+      { total: y.score, solved: true, invalid: y.invalid, elapsedMs: y.elapsedMs, sessionId: y.sessionId }))
+    .slice(0, 50);
+  const daily = {};
+  for (const k of new Set([...Object.keys(obj(ra.daily)), ...Object.keys(obj(la.daily))])) {
+    daily[k] = uniq([...(obj(ra.daily)[k] || []), ...(obj(la.daily)[k] || [])]).sort((x, y) => y.score - x.score).slice(0, 20);
+  }
+  return {
+    v: 1, savedAt: Date.now(),
+    progress: { version: 1, data: merged, sum: checksum(merged) },
+    settings: obj(local).settings || obj(remote).settings || null,
+    scores: { global, daily },
+  };
+}
+
 // Remote-preferred import: a valid remote doc overwrites the local cache.
 // Returns true when at least one section was applied.
 export function importDoc(doc) {
@@ -376,6 +418,6 @@ export function track(eventName) {
 export default {
   Session, DEFAULT_SETTINGS, loadSettings, saveSettings, ACHIEVEMENTS,
   loadProgress, saveProgress, saveSnapshot, loadSnapshot, clearSnapshot,
-  recordScore, getScores, exportDoc, importDoc, checkAchievements,
+  recordScore, getScores, exportDoc, importDoc, mergeDocs, checkAchievements,
   validateReplay, getSessionId, track,
 };

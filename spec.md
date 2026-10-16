@@ -30,15 +30,20 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 | `src/session.js` | Round lifecycle, command log, undo stack, replay envelope, localStorage persistence, achievements, local boards |
 | `src/render.js` | Three.js atelier scene, pegs, loops, markers, particles, dust motes, tweens, IBL, shadows, post chain, adaptive resolution, peg raycasting |
 | `src/gfx.js` | Pure graphics quality model: presets, categories, GPU detection, `resolve` / `presetTier` / `choosePreset` / `describe` |
-| `src/gfx-i18n.js` | Graphics panel strings in the nine locales and the `navigator.language` locale picker |
+| `src/gfx-i18n.js` | Graphics panel strings in the nine locales, picked for the game language |
+| `src/i18n.js`, `src/locales/` | Localization core (`T`, `N`, `setLocale`, `onLanguage`, `applyMarkup`) and per-locale catalogues keyed by the US-English text |
+| `sh-language.js` | Shared StarHermit language preference (`window.StarHermitLanguage`), an unmodified copy of `tools/sh-language.js` |
+| `game-options.js` | Shared frame-rate / Language / Sound / Report-a-problem sections, mounted inside the Graphics block (`data-options-graphics`); an unmodified copy of `tools/game-options.js` |
 | `src/audio.js` | WebAudio buses, authored clip playback with procedural fallback, ambience, adaptive music, captions |
 | `starhermit-sdk.js` | Shared StarHermit client (unmodified copy, loaded by `index.html`) |
 | `src/platform.js` | Adapter over the SDK: handshake, sign-in/invite, nickname, cloud-save mirror, settings KV, key bindings, leaderboard read + `submitScore`; dev-server routes off-platform only |
-| `src/sh-strings.js` | Account strings in the nine locales |
+| `src/sh-strings.js` | Account strings in the nine locales, following the game language |
 | `src/server-time.js` | UTC day number the Daily uses; round-trip-corrected `GET /api/v1/time` when signed in, local clock standalone |
 | `score-script.js` | StarHermit platform script (`server=score-script.js`): range-checks a finished round's total sent through `StarHermit.submitScores` and posts it to the `high-score` leaderboard (canonical copy in the games repo's `tools/score-script.js`) |
 | `server.js` | Local-dev backend: static host + API (time, daily, replay-validated scores, achievements, presence); the client no longer calls these routes |
-| `tests/rules.test.js` `tests/content.test.js` `tests/session.test.js` `tests/gfx.test.js` `tests/platform.test.js` | `node --test` unit/property/golden/graphics-model suites, plus the StarHermit adapter over the real SDK with a stubbed fetch |
+| `tests/rules.test.js` `tests/content.test.js` `tests/session.test.js` `tests/gfx.test.js` `tests/platform.test.js` | `node --test` unit/property/golden/graphics-model suites, plus the StarHermit adapter over the real SDK with a stubbed fetch (conditional cloud writes, conflict merge) |
+| `tests/i18n.test.js`, `tests/i18n-keys.mjs` | Every UI key in all nine locales with matching placeholders |
+| `tests/starhermit-e2e.mjs` | Stubbed StarHermit API for the signed-in e2e steps |
 | `tests/e2e.mjs` | Playwright-core playthrough of the real UI at three viewports |
 | `sfx/manifest.txt` | Canonical clip table (`file \| event id \| description \| usage`); `manifest.json` drives generation |
 | `assets/` | `atelier-backdrop.webp` (menu backdrop), `linen-weave.webp` (table/mat texture) |
@@ -391,17 +396,27 @@ the board mirror (and above any open overlay) — including while muted, so the 
 
 The nine required locales are **en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT**.
 
-Today all shipped strings are en-US and are authored inline: static copy in `index.html`, dynamic copy in
-`src/main.js` (the `REASONS` table, `stateLabel`, HUD and rail text, help cards, results rows,
-announcements), colour names in `src/content.js` and caption strings in `src/audio.js`. `<html lang>` is
-`en`. The UI is already built for expansion — panels and buttons size to content, text blocks cap at
-70 characters rather than at a pixel width, and nothing is laid out against a fixed English string length
-— so a 35 % expansion into de-DE fits without reflow work. Extracting these strings into a locale table
-with a `navigator.language` chooser and a settings override is the largest outstanding gap in the game;
-see §17.
-The one exception is the Graphics settings section and the title's Settings button, whose strings live in
-`src/gfx-i18n.js` for all nine locales and are chosen from `navigator.language` (closest match, en-US
-fallback).
+Every shipped string is localized. Static markup carries `data-i18n` / `data-i18n-aria` /
+`data-i18n-title` (the Graphics labels use `data-gfx-i18n` and come from `src/gfx-i18n.js`); code calls
+`T('<US-English text>', vars)` from `src/i18n.js`. Catalogues in `src/locales/` are keyed by the US-English
+text (en-US is the identity, en-GB lists the *colour* spellings, es-ES and fr-CA list their differences
+from es-419 and fr-FR). Content copy — colour names, lessons and their step prompts, challenges, the
+Daily Loom / Score Chase titles, achievements and audio captions — is English data translated at display
+time; stage and practice titles are composed from their numbers.
+
+- Settings → Graphics block → **Language → Game language** (rendered by `game-options.js` from the
+  `sh-language.js` instance) offers **Automatic — <resolved language>** plus the nine locales by native
+  name and a status line (Saved to account / Saved on this device / Account sync unavailable); it is
+  reachable from the title and from the pause menu.
+- A change applies immediately: markup is re-applied, `<html lang>` updates, and `relocalize()` re-renders
+  the Graphics labels, title status, progression rail, the open setup/help/results screen, the HUD,
+  rails and the accessible peg mirror. The round is untouched.
+- Resolution (`sh-language.js`): explicit game choice → for Automatic, the StarHermit account's
+  `preferredLanguage` (`GET /api/v1/me/language`, signed in only) → `navigator.languages` → en-US. The
+  choice is stored per player in `localStorage['loop-loom.language.<user|guest>']` and, signed in, in
+  the per-player settings key `ui.language` as `{ choice }`; the game's settings mirror only adopts and
+  patches its own keys. `?lang=` forces a locale for the page load (QA).
+- The layout tolerates German expansion at 390 px (panels and buttons size to content).
 
 ---
 
@@ -465,7 +480,16 @@ the bundle) via `src/platform.js`; without a launch token nothing calls the plat
   (`StarHermit.leaderboard()`) and refreshed after each post; personal bests stay local and
   cloud-mirrored. Achievements stay local (part of the cloud-saved doc).
 
-Account and leaderboard strings are localized in the nine locales (`src/sh-strings.js`). Query-string tokens
+- **Save conflicts.** After the boot load, cloud writes are conditional (SDK ETag). When another
+  device saved first the SDK emits `saveconflict`; the game reloads the slot, merges it with the local
+  document (`session.mergeDocs`: furthest journey unlock, union of completed stages, lessons and daily
+  days, achievements with the earliest time, the larger round count, best scores, both score tables
+  de-duplicated by session, this device's settings), adopts it and saves again.
+- **Report a problem.** Settings (signed in only, from `game-options.js`) files a bug report through
+  `StarHermit.reportBug`; uncaught errors are filed as crash reports through `StarHermit.captureCrashes`
+  (SDK-capped).
+
+Account and leaderboard strings are localized in the nine locales (`src/sh-strings.js`) and follow the game language. Query-string tokens
 (`?game_token=`) remain a local-dev convenience. Signed in, the only own-server route used is
 `GET /api/v1/time` (Daily UTC day). Standalone (no launch token) the client makes no request to
 any `/api` or `/ws` route: local clock, local boards and achievements, no activity, presence,
@@ -527,7 +551,7 @@ standalone).
 
 ## 14. Testing and acceptance criteria
 
-`npm test` builds the bundle and runs 37 `node --test` cases:
+`npm test` builds the bundle and runs 54 `node --test` cases:
 
 - **Rules** — group lift boundaries, capacity truncation, every rejection reason, invalid tallying,
   solved and move-limit terminals, monotonic `tick`, integer score components, serialization round-trip,
@@ -542,6 +566,10 @@ standalone).
 - **Graphics** — `detectPreset` on sample GPU strings (software, discrete, integrated, mobile cap),
   `resolve` with presets/overrides/invalid tiers/scale clamp, preset choice clearing overrides,
   `describe`, and every graphics string present in all nine locales.
+- **Platform** — the adapter over the real SDK: token, profile, settings KV, bindings, invite link, zero
+  fetches standalone, sign-in on a UUID host, and a stale conditional write (412) that fires the conflict
+  hook and lands after `mergeDocs`.
+- **i18n** — every key used in code and markup exists in all nine locales with the same placeholders.
 
 `npm run test:e2e` runs three passes — desktop 1280×800, mobile 390×844 with touch, and a no-WebGL pass
 — each covering title, modes open/close (button and `Escape`), setup, round start, a deliberate illegal
@@ -549,7 +577,11 @@ drop (rejected, board unchanged, charged exactly −15 once), title → Settings
 Low on the software GPU; Ultra, Low and High applied and reflected in `data-gfx-preset` and the summary; a
 bloom override and the frame-rate readout survive a reload; picking a preset clears the override),
 pause → settings → resume, a full solve
-through the peg buttons, the results screen reading "Loom complete!", and the return to title.
+through the peg buttons, the results screen reading "Loom complete!", and the return to title; then,
+signed in against a stubbed API, `GET /api/v1/me/language` → fr-CA makes Automatic resolve to fr-CA,
+Deutsch re-renders Settings in place (the Language select survives), PUTs `ui.language`, a Report a
+problem posts to `/reports`, and Italiano chosen from the pause menu re-renders the pause menu, HUD, tray
+and peg labels while the board stays the same.
 
 **QA bar, as checkable statements.** Every mode the title and modes screens expose is reachable and
 completable in the browser. The first-time player is taught by Learn, which requires the action, and by a
@@ -585,7 +617,6 @@ theme colours and the `#17130f` backdrop ground stay in place and nothing else c
 
 ## 16. Known limitations
 
-- **English only.** Nine locales are required; nine are not implemented (§10).
 - **Local boards are per-device.** With the host unreachable, `Top scores` shows only this browser's
   results and every entry is the local player's, so the comparison line on the results screen is a
   personal best rather than a ranking.
@@ -597,7 +628,7 @@ theme colours and the `#17130f` backdrop ground stay in place and nothing else c
 - **`holdToLift` and `timingAssist` settings persist but only `timingAssist` changes behaviour** (it
   suppresses the speed-challenge timer); tap-to-select is always the pointer model.
 - **Cloud save needs a hosted launch token.** With one, progress/settings/scores
-  mirror to the platform cloud slot and the remote copy wins on conflict; offline
+  mirror to the platform cloud slot (remote wins at boot, conflicting writes are merged); offline
   (local play) progress lives only in this browser's `localStorage`, and clearing
   site data resets the Journey.
 
@@ -605,13 +636,9 @@ theme colours and the `#17130f` backdrop ground stay in place and nothing else c
 
 ## 17. Design intent not yet implemented
 
-1. **Localization.** A `src/i18n.js` locale table keyed by string id, `data-i18n` attributes on the
-   static markup in `index.html`, a chooser that reads `navigator.language` with a settings override,
-   and translations for en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR and it-IT. The layout
-   already tolerates the expansion; only the string extraction and the translations are missing.
-2. **Hold-to-lift pointer mode.** The setting exists and persists; the pointer handler still only
+1. **Hold-to-lift pointer mode.** The setting exists and persists; the pointer handler still only
    implements tap-to-select and drag.
-3. **Server-backed friend comparison.** `fetchScores` and the server's GET board exist, but the results
+2. **Server-backed friend comparison.** `fetchScores` and the server's GET board exist, but the results
    screen only reads the local board, so an online player sees their own history rather than the global
    top entries.
 
