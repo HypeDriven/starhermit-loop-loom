@@ -190,6 +190,8 @@ async function runPass(tag, contextOpts) {
       if (await preset() !== 'low') throw new Error('Auto should detect low on a software GPU, got ' + await preset());
       const autoLabel = await page.locator('#set-quality option[value="auto"]').innerText();
       if (!/Auto/.test(autoLabel) || !/Low/.test(autoLabel)) throw new Error('auto label: ' + autoLabel);
+      // The summary names the StarHermit hardware level (software GPU = level 0).
+      if (!/Level 0/.test(await page.locator('#gfx-summary').innerText())) throw new Error('summary lacks the hardware level: ' + await page.locator('#gfx-summary').innerText());
       await page.selectOption('#set-quality', 'ultra');
       await page.waitForFunction(() => document.body.dataset.gfxPreset === 'ultra');
       await page.waitForTimeout(700); // render a few frames with the full post chain

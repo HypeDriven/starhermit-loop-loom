@@ -17,7 +17,7 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 | Session | 40 s (Learn lesson) to ~4 min (difficulty 10 Practice board); one Journey stage ≈ 1–2 min |
 | Platforms | Desktop and mobile browsers, portrait and landscape; keyboard, mouse, touch, gamepad |
 | Rendering | Three.js r169 WebGL scene with optional post-processing (same-revision addons, bundled from `node_modules/three`), with a DOM board mirror that is fully playable when WebGL is absent |
-| Build | `esbuild` bundles `src/main.js` → `lib/bundle.js` (ESM, minified); `index.html` loads only that bundle |
+| Build | `esbuild` bundles `src/main.js` → `lib/bundle.js` (ESM, minified); `index.html` loads that bundle after the classic shared scripts (`gpu-level.js` among them) |
 
 ### File map
 
@@ -29,7 +29,9 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 | `src/content.js` | Themes, palettes, glyphs, Journey (48 stages), Learn lessons, Daily, Practice, Challenges, Score Chase, content validation |
 | `src/session.js` | Round lifecycle, command log, undo stack, replay envelope, localStorage persistence, achievements, local boards |
 | `src/render.js` | Three.js atelier scene, pegs, loops, markers, particles, dust motes, tweens, IBL, shadows, post chain, adaptive resolution, peg raycasting |
-| `src/gfx.js` | Pure graphics quality model: presets, categories, GPU detection, `resolve` / `presetTier` / `choosePreset` / `describe` |
+| `src/gfx.js` | Pure graphics quality model: presets, categories, per-preset budgets (`BUDGETS`, `budget`), hardware level → preset (`LEVELS`, `detectLevel`, `presetForLevel`, `detectPreset`), `resolve` / `presetTier` / `choosePreset` / `describe` |
+| `gpu-level.js` | Shared StarHermit hardware-level detector (`window.StarHermitGpu`; copy of the canonical tools file, not edited here) |
+| `tests/gfx-bench.mjs` | Dev-only hook for `tools/gfx-bench.mjs` (60 FPS per-preset benchmark on real GPUs) |
 | `src/gfx-i18n.js` | Graphics panel strings in the nine locales, picked for the game language |
 | `src/i18n.js`, `src/locales/` | Localization core (`T`, `N`, `setLocale`, `onLanguage`, `applyMarkup`) and per-locale catalogues keyed by the US-English text |
 | `sh-language.js` | Shared StarHermit language preference (`window.StarHermitLanguage`), an unmodified copy of `tools/sh-language.js` |
@@ -320,28 +322,64 @@ and CSS transitions; loops jump to their exact positions and the game is fully p
 with PCF soft shadows whose shadow box is fitted to the peg row and mat (refitted when the peg count
 changes), a hemisphere fill and a cool rim. Optional effects: image-based lighting from a prefiltered
 `RoomEnvironment` (reflections on brass; low intensity so the atelier stays warm and dim); a detailed
-material set — loops in `MeshPhysicalMaterial` with sheen and a procedural yarn-twist texture used as
-colour and bump map, clear-coated brass pegs with a turned collar, spools with wooden flanges and
+material set — loops with a procedural yarn-twist texture used as colour and bump map (sheen
+`MeshPhysicalMaterial` on High/Ultra), brass pegs (clear-coated on High/Ultra) with a turned collar, spools with wooden flanges and
 higher-segment geometry; GTAO contact darkening; bloom limited to highlights (threshold 0.9: sparks,
 brass glints); a colour grade (gentle S-curve, +10 % saturation, warm highlights / cool shadows) with
 vignette; FXAA/SMAA/MSAA; soft additive particles tinted with the completed peg's yarn colour; and
 ambient motion — ~70 dust motes drifting behind the pegs, a shallow lamp shimmer on the key light and a
 breathing warm glow over the menu backdrop. Ambient motion and particles stop under reduced motion.
 The Settings panel's **Graphics** section (reachable from the title and pause screens) offers a
-quality preset — Auto (chosen from the unmasked WebGL renderer string: software renderers get Low,
-discrete GPUs and Apple M get High, others Balanced; touch devices cap at Balanced), Low, Balanced,
-High, Ultra — a render scale (50–200 %), one override per category ("From preset (…)" by default):
+quality preset — Auto (chosen from the StarHermit hardware level below), Low, Balanced, High, Ultra — a render scale (50–200 %), one override per category ("From preset (…)" by default):
 shadows (off / low 1024² / medium 2048² / high 4096²), ambient occlusion (off/on/high), bloom, colour
 grade, anti-aliasing (off/FXAA/SMAA/MSAA), reflections, particles (low/high), ambient motion
 (still/animated) and detail (plain/detailed); adaptive resolution (averages 90 frames, steps down 0.1 to
 a floor of 0.6 when frames exceed 26 ms, back up 0.05 below 14 ms); a frame-rate readout (bottom-left,
-under the HUD controls); and a summary "GPU · cost · W×H px". Pixel ratio is
+under the HUD controls); and a summary "GPU · Level N · cost · W×H px" (the level label localized). Pixel ratio is
 min(DPR, preset cap: Low 1, Balanced 1.5, High/Ultra 2) × preset scale (Ultra 1.25) × render scale ×
 adaptive scale. Low renders with no post chain, no shadows and no environment map — the pre-upgrade
 cost. Choosing a preset clears overrides; changes apply live and persist in `settings.graphics`
 (the old `quality` tier migrates onto a preset). If the post chain cannot be built the game renders
 without it and the panel says so. The preset is exposed as `data-gfx-preset` on `<body>` and the canvas.
 Panel strings are localized in all nine locales (§10).
+
+**Hardware level and Auto.** `gpu-level.js` (the shared StarHermit detector, `window.StarHermitGpu`,
+loaded as a classic script before `lib/bundle.js`) rates the GPU 0–20 (0 = Galaxy S20 / Intel UHD or
+weaker, 20 = RTX 5090, each level ≈ 1.23× the one below; laptop parts two levels lower; phones, tablets
+and ≤ 4 GB machines capped at 9; software renderers 0). Auto picks **Low from 0, Balanced from 4, High
+from 10, Ultra from 17**, so strong desktop GPUs get Ultra; adaptive resolution still steps down when
+frames are slow. On phones and tablets the shared frame-rate option paces Auto at half the display
+refresh rate and starts at 16 simultaneous sounds.
+
+**Per-preset budgets** (`BUDGETS` in `src/gfx.js`; each tuned to hold 60 FPS on the weakest GPU Auto
+gives it — Low: level 0 phones / Intel UHD, Balanced: level 4 Iris Xe, High: level 10 GTX 1070, Ultra:
+level 17 RTX 4080). Gameplay is identical on every preset.
+
+| Preset | Materials (loops, pegs, spools, table) | Loop draw calls | Yarn texture | Geometry LOD | Dust motes | Sparks (× counts and cap) | Bloom / GTAO resolution |
+|---|---|---|---|---|---|---|---|
+| Low | Lambert | 1 (torus + stitch merged, vertex-coloured) | 64×16 px | ½ | 35 | 0.5× | ½ / ½ |
+| Balanced | Standard | 2 | 128×32 px | ¾ | 50 | 0.75× | ½ / ½ |
+| High | Physical (sheen yarn, clearcoat brass) with detail | 2 | 128×32 px | 1 | 70 | 1× | ½ / ½ |
+| Ultra | Physical (sheen yarn, clearcoat brass) with detail | 2 | 256×64 px | 1.5 | 120 | 1.5× | full / full |
+
+Geometry LOD multiplies the segments of the loop tori, peg stems, knobs, bases and collars, spools and
+flanges, the mat and the loose strands. Sparks scale within the preset by the hardware level
+(`StarHermitGpu.scaleBudget`, ≤ 2×; fewer below the floor). Materials, cached loop geometry, the board
+and the dust are rebuilt when the preset changes. Bloom and GTAO run at a fraction of the frame through
+a wrapped pass `setSize`.
+
+**60 FPS benchmark** (`node tools/gfx-bench.mjs loop-loom [--mobile --presets low,balanced]`, dev-only,
+real GPUs; hook `tests/gfx-bench.mjs` picks the preset in Settings → Graphics, starts Journey stage 1
+and keeps lifting and dropping loop groups through the visible peg buttons, starting a new round after a
+solve). Measured 2026-10-17 (an AMD Radeon iGPU at level 2 projected to each preset's floor level, the
+same page with draws skipped subtracted; typical p50 ≤ 12 ms and slow p90 ≤ 14 ms, CPU p90 ≤ 6 ms on
+the NVIDIA run):
+
+- Desktop 1920×1080: PASS low (typical 0.00, slow 4.53 ms at level 0; CPU 0.70 ms); PASS balanced
+  (typical 4.73, slow 3.37 ms at level 4; CPU 1.40 ms); PASS high (typical 3.69, slow 4.32 ms at level
+  10; CPU 2.10 ms); PASS ultra (typical 3.83, slow 4.44 ms at level 17; CPU 2.80 ms).
+- Mobile 390×844 @3×: PASS low (typical 0.91, slow 0.61 ms at level 0; CPU 0.60 ms); PASS balanced
+  (typical 2.79, slow 0.00 ms at level 4; CPU 1.10 ms).
 
 **Visual assets the design calls for.** A warm atelier key art that shows the actual object the game is
 about (cover); a very dark, defocused atelier interior behind the menu overlays so the title screen has
@@ -563,7 +601,9 @@ standalone).
   determinism, invalid attempts counted exactly once and surviving a replay, snapshot round-trip,
   malformed envelopes rejected without throwing, journey unlock advancing exactly one stage, stable
   achievement ids, and a golden test pinning representative session scores.
-- **Graphics** — `detectPreset` on sample GPU strings (software, discrete, integrated, mobile cap),
+- **Graphics** — the hardware level → preset mapping (SwiftShader / llvmpipe / `Radeon Graphics` / UHD →
+  Low, Iris Xe → Balanced, GTX 1070 → High, RTX 4080 / 5090 → Ultra, phones and tablets Balanced at most),
+  the per-preset budget table and its level scaling,
   `resolve` with presets/overrides/invalid tiers/scale clamp, preset choice clearing overrides,
   `describe`, and every graphics string present in all nine locales.
 - **Platform** — the adapter over the real SDK: token, profile, settings KV, bindings, invite link, zero
@@ -574,7 +614,7 @@ standalone).
 `npm run test:e2e` runs three passes — desktop 1280×800, mobile 390×844 with touch, and a no-WebGL pass
 — each covering title, modes open/close (button and `Escape`), setup, round start, a deliberate illegal
 drop (rejected, board unchanged, charged exactly −15 once), title → Settings → Graphics (Auto resolves to
-Low on the software GPU; Ultra, Low and High applied and reflected in `data-gfx-preset` and the summary; a
+Low on the software GPU and the summary names Level 0; Ultra, Low and High applied and reflected in `data-gfx-preset` and the summary; a
 bloom override and the frame-rate readout survive a reload; picking a preset clears the override),
 pause → settings → resume, a full solve
 through the peg buttons, the results screen reading "Loom complete!", and the return to title; then,

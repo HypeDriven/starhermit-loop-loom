@@ -344,7 +344,7 @@ function refreshGraphicsUI() {
   $('gfx-scale-value').textContent = pct + '%';
   $('gfx-adaptive').checked = r.adaptive;
   $('gfx-fps').checked = r.showFps;
-  $('gfx-summary').textContent = info.webgl ? `${info.gpu} · ${info.summary}` : info.summary;
+  $('gfx-summary').textContent = info.webgl ? `${info.gpu} · ${(G.level || 'Level {level}').replace('{level}', info.level ?? 0)} · ${info.summary}` : info.summary;
   const note = $('gfx-note');
   const msg = !info.webgl ? G.noWebgl : info.postFailed ? G.postFailed : '';
   note.textContent = msg;

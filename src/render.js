@@ -14,9 +14,10 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { mulberry32 } from './rules.js';
 import { getTheme, PALETTES } from './content.js';
-import { detectPreset, describe, resolve, SHADOW_MAP, PARTICLE_BUDGET } from './gfx.js';
+import { detectLevel, presetForLevel, describe, resolve, SHADOW_MAP, PARTICLE_BUDGET } from './gfx.js';
 
 const LAYER_ENV = 0, LAYER_GAME = 1, LAYER_MARKER = 2, LAYER_FX = 3;
 
@@ -33,6 +34,7 @@ let reducedMotion = false;
 let q = resolve({}, 'low');
 let gpuName = '';
 let detected = 'balanced';
+let level = 0;
 let savedGfx = {};
 let composer = null;
 let gradePass = null;
@@ -101,12 +103,16 @@ function requestWeave(cb) {
 
 // Procedural yarn twist: diagonal plies, used as a colour modulation and bump
 // map on detailed loops so the torus reads as spun fibre rather than plastic.
+// Drawn in 128 × 32 units at the preset budget's width (`yarn`).
 let yarnTexture = null;
 function getYarnTexture() {
+  const px = q.budget.yarn;
+  if (yarnTexture && yarnTexture.image.width !== px) { yarnTexture.dispose(); yarnTexture = null; }
   if (yarnTexture || typeof document === 'undefined') return yarnTexture;
   const c = document.createElement('canvas');
-  c.width = 128; c.height = 32;
+  c.width = px; c.height = px / 4;
   const g = c.getContext('2d');
+  g.scale(px / 128, px / 128);
   g.fillStyle = '#e6e6e6';
   g.fillRect(0, 0, 128, 32);
   for (let x = -32; x < 160; x += 8) {
@@ -150,6 +156,30 @@ function getSoftDot() {
 
 const detailed = () => q.detail === 'detailed';
 
+// Geometry LOD: segment counts scaled by the preset budget (`segments`), never below `min`.
+const seg = (n, min = 3) => Math.max(min, Math.round(n * q.budget.segments));
+
+// Material class per budget: Lambert (Low), Standard (Balanced), Physical where `phys` is given
+// (High/Ultra; otherwise Standard).
+function budgetMaterial(params, phys) {
+  const kind = q.budget.material;
+  if (kind === 'lambert') {
+    const { roughness, metalness, envMapIntensity, ...rest } = params;
+    return new THREE.MeshLambertMaterial(rest);
+  }
+  if (kind === 'physical' && phys) return new THREE.MeshPhysicalMaterial({ ...params, ...phys });
+  return new THREE.MeshStandardMaterial(params);
+}
+
+// Run a post pass at a fraction of the frame (per-preset budget). EffectComposer sizes every pass to the
+// full frame in addPass/setSize, so the pass's own setSize is wrapped to apply the scale.
+function atScale(pass, k) {
+  if (!(k > 0 && k < 1)) return pass;
+  const setSize = pass.setSize.bind(pass);
+  pass.setSize = (w, h) => setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
+  return pass;
+}
+
 function pegX(i, count) {
   const spacing = count > 6 ? 1.05 : 1.3;
   return (i - (count - 1) / 2) * spacing;
@@ -166,7 +196,7 @@ function buildEnvironment() {
   // Table top — soft fiber wood.
   const table = new THREE.Mesh(
     new THREE.BoxGeometry(24, 0.5, 14),
-    new THREE.MeshStandardMaterial({ color: theme.floor, roughness: 0.9, metalness: 0.05, envMapIntensity: 0.25 }));
+    budgetMaterial({ color: theme.floor, roughness: 0.9, metalness: 0.05, envMapIntensity: 0.25 }));
   table.position.y = -0.25;
   table.receiveShadow = true;
   env.add(table);
@@ -180,8 +210,8 @@ function buildEnvironment() {
 
   // Woven mat under the pegs.
   const mat = new THREE.Mesh(
-    new THREE.CylinderGeometry(5.6, 5.9, 0.08, 48),
-    new THREE.MeshStandardMaterial({ color: new THREE.Color(theme.floor).multiplyScalar(1.25), roughness: 1, envMapIntensity: 0.25 }));
+    new THREE.CylinderGeometry(5.6, 5.9, 0.08, seg(48, 16)),
+    budgetMaterial({ color: new THREE.Color(theme.floor).multiplyScalar(1.25), roughness: 1, envMapIntensity: 0.25 }));
   mat.position.y = 0.04;
   mat.receiveShadow = true;
   env.add(mat);
@@ -198,16 +228,16 @@ function buildEnvironment() {
     const r = decorRng();
     const h = 0.5 + decorRng() * 0.5;
     const spool = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.22 + r * 0.15, 0.22 + r * 0.15, h, detailed() ? 28 : 14),
-      detailed() ? yarnMaterial(i % palette.length, 0.5) : new THREE.MeshStandardMaterial({ color: new THREE.Color(palette[i % palette.length]), roughness: 0.85 }));
+      new THREE.CylinderGeometry(0.22 + r * 0.15, 0.22 + r * 0.15, h, detailed() ? seg(28, 10) : seg(14, 8)),
+      detailed() ? yarnMaterial(i % palette.length, 0.5) : budgetMaterial({ color: new THREE.Color(palette[i % palette.length]), roughness: 0.85 }));
     spool.position.set(-7 + decorRng() * 14, 0.3, -4.5 - decorRng() * 2);
     spool.castShadow = true;
     env.add(spool);
     if (detailed()) {
       // Wooden flanges top and bottom.
-      const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: 0.7, envMapIntensity: 0.3 });
+      const wood = budgetMaterial({ color: 0x6b4a2f, roughness: 0.7, envMapIntensity: 0.3 });
       for (const sgn of [-1, 1]) {
-        const fl = new THREE.Mesh(new THREE.CylinderGeometry(0.3 + r * 0.15, 0.3 + r * 0.15, 0.05, 28), wood);
+        const fl = new THREE.Mesh(new THREE.CylinderGeometry(0.3 + r * 0.15, 0.3 + r * 0.15, 0.05, seg(28, 10)), wood);
         fl.position.set(spool.position.x, spool.position.y + sgn * h / 2, spool.position.z);
         fl.castShadow = true;
         env.add(fl);
@@ -224,11 +254,43 @@ function buildEnvironment() {
     }
     const curve = new THREE.CatmullRomCurve3(pts);
     const tube = new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 24, 0.02, 5),
-      new THREE.MeshStandardMaterial({ color: new THREE.Color(palette[(i + 2) % palette.length]), roughness: 1 }));
+      new THREE.TubeGeometry(curve, seg(24, 12), 0.02, 5),
+      budgetMaterial({ color: new THREE.Color(palette[(i + 2) % palette.length]), roughness: 1 }));
     env.add(tube);
   }
   return env;
+}
+
+function stitchGeometry(colorIdx) {
+  switch (colorIdx % 6) {
+    case 0: return new THREE.SphereGeometry(0.07, 8, 8);
+    case 1: return new THREE.ConeGeometry(0.07, 0.12, 8);
+    case 2: return new THREE.BoxGeometry(0.1, 0.1, 0.1);
+    case 3: return new THREE.OctahedronGeometry(0.08);
+    case 4: return new THREE.ConeGeometry(0.08, 0.12, 4);
+    default: return new THREE.CylinderGeometry(0.06, 0.06, 0.1, 8);
+  }
+}
+
+// Low budget (`merge`): torus and stitch merged into one vertex-coloured geometry per colour, so each
+// loop is a single draw call with one shared Lambert material.
+const STITCH_COLOR = new THREE.Color(0xf5f0e6);
+function mergedLoopGeometry(colorIdx) {
+  const key = 'merged-' + colorIdx;
+  if (geoCache[key]) return geoCache[key];
+  const paint = (geo, color) => {
+    const g = geo.index ? geo.toNonIndexed() : geo;
+    const n = g.attributes.position.count, col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) col.set([color.r, color.g, color.b], i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    return g;
+  };
+  const ring = loopGeoPlain().clone().rotateX(Math.PI / 2);
+  const stitch = stitchGeometry(colorIdx).translate(LOOP_R, LOOP_TUBE * 0.6, 0);
+  const merged = mergeGeometries([paint(ring, new THREE.Color(palette[colorIdx % palette.length])), paint(stitch, STITCH_COLOR)]);
+  merged.userData.cached = true;
+  geoCache[key] = merged;
+  return merged;
 }
 
 function makeLoopGeometry(colorIdx) {
@@ -236,7 +298,13 @@ function makeLoopGeometry(colorIdx) {
   // channel: crimson sphere, indigo cone, fern box, marigold octahedron,
   // violet pyramid, ember cylinder.
   const group = new THREE.Group();
-  const mat = detailed() ? yarnMaterial(colorIdx, 1) : cachedMaterial('loop-' + colorIdx, () => new THREE.MeshStandardMaterial({
+  if (q.budget.merge && !detailed()) {
+    const mesh = new THREE.Mesh(mergedLoopGeometry(colorIdx), cachedMaterial('loop-merged', () => new THREE.MeshLambertMaterial({ vertexColors: true })));
+    mesh.castShadow = true;
+    group.add(mesh);
+    return group;
+  }
+  const mat = detailed() ? yarnMaterial(colorIdx, 1) : cachedMaterial('loop-' + colorIdx, () => budgetMaterial({
     color: new THREE.Color(palette[colorIdx % palette.length]),
     roughness: 0.75, metalness: 0.05,
   }));
@@ -245,16 +313,7 @@ function makeLoopGeometry(colorIdx) {
   ring.castShadow = true;
   ring.receiveShadow = detailed();
   group.add(ring);
-  let markerGeo;
-  switch (colorIdx % 6) {
-    case 0: markerGeo = new THREE.SphereGeometry(0.07, 8, 8); break;
-    case 1: markerGeo = new THREE.ConeGeometry(0.07, 0.12, 8); break;
-    case 2: markerGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1); break;
-    case 3: markerGeo = new THREE.OctahedronGeometry(0.08); break;
-    case 4: markerGeo = new THREE.ConeGeometry(0.08, 0.12, 4); break;
-    default: markerGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.1, 8);
-  }
-  const stitch = new THREE.Mesh(markerGeo, cachedMaterial('stitch', () => new THREE.MeshStandardMaterial({ color: 0xf5f0e6, roughness: 0.6 })));
+  const stitch = new THREE.Mesh(stitchGeometry(colorIdx), cachedMaterial('stitch', () => budgetMaterial({ color: 0xf5f0e6, roughness: 0.6 })));
   stitch.position.set(LOOP_R, LOOP_TUBE * 0.6, 0);
   group.add(stitch);
   return group;
@@ -278,45 +337,45 @@ function yarnMaterial(colorIdx, repeatU) {
     const tex = getYarnTexture();
     let map = tex;
     if (tex && repeatU !== 1) { map = tex.clone(); map.repeat.set(10 * repeatU, 1); map.needsUpdate = true; }
-    return new THREE.MeshPhysicalMaterial({
+    return budgetMaterial({
       color: col, roughness: 0.78, metalness: 0,
       map: map || null, bumpMap: map || null, bumpScale: 1.2,
-      sheen: 1, sheenRoughness: 0.45, sheenColor: col.clone().lerp(new THREE.Color(0xffffff), 0.45),
       envMapIntensity: 0.45,
-    });
+    }, { sheen: 1, sheenRoughness: 0.45, sheenColor: col.clone().lerp(new THREE.Color(0xffffff), 0.45) });
   });
 }
 
 let geoCache = {};
-function loopGeoPlain() { return geoCache.plain || (geoCache.plain = new THREE.TorusGeometry(LOOP_R, LOOP_TUBE, 10, 20)); }
-function loopGeoDetailed() { return geoCache.detailed || (geoCache.detailed = new THREE.TorusGeometry(LOOP_R, LOOP_TUBE, 22, 44)); }
+// Loop tori at the preset's geometry LOD (geoCache is cleared when the budget changes).
+function loopGeoPlain() { return geoCache.plain || (geoCache.plain = new THREE.TorusGeometry(LOOP_R, LOOP_TUBE, seg(10, 6), seg(20, 12))); }
+function loopGeoDetailed() { return geoCache.detailed || (geoCache.detailed = new THREE.TorusGeometry(LOOP_R, LOOP_TUBE, seg(22, 8), seg(44, 16))); }
 
 function brassMaterial() {
   return cachedMaterial('brass', () => detailed()
-    ? new THREE.MeshPhysicalMaterial({ color: theme.brass, metalness: 0.95, roughness: 0.26, clearcoat: 0.3, clearcoatRoughness: 0.2, envMapIntensity: 0.85 })
-    : new THREE.MeshStandardMaterial({ color: theme.brass, metalness: 0.85, roughness: 0.35 }));
+    ? budgetMaterial({ color: theme.brass, metalness: 0.95, roughness: 0.26, envMapIntensity: 0.85 }, { clearcoat: 0.3, clearcoatRoughness: 0.2 })
+    : budgetMaterial({ color: theme.brass, metalness: 0.85, roughness: 0.35 }));
 }
 
 function makePeg(x) {
   const g = new THREE.Group();
   const brass = brassMaterial();
-  const seg = detailed() ? 28 : 14;
-  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, PEG_H, seg), brass);
+  const sides = detailed() ? seg(28, 10) : seg(14, 8);
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, PEG_H, sides), brass);
   stem.position.y = PEG_H / 2;
   stem.castShadow = true;
   g.add(stem);
-  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.15, detailed() ? 24 : 12, detailed() ? 18 : 10), brass);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.15, detailed() ? seg(24, 10) : seg(12, 8), detailed() ? seg(18, 8) : seg(10, 6)), brass);
   knob.position.y = PEG_H + 0.08;
   knob.castShadow = true;
   g.add(knob);
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.12, detailed() ? 40 : 20), brass);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.12, detailed() ? seg(40, 16) : seg(20, 12)), brass);
   base.position.y = 0.06;
   base.castShadow = detailed();
   base.receiveShadow = true;
   g.add(base);
   if (detailed()) {
     // A turned collar where the stem meets the base.
-    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.035, 10, 28), brass);
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.035, seg(10, 6), seg(28, 12)), brass);
     collar.rotation.x = Math.PI / 2;
     collar.position.y = 0.14;
     g.add(collar);
@@ -327,7 +386,7 @@ function makePeg(x) {
 
 function disposeGeometries(root) {
   root.traverse((o) => {
-    if (o.geometry && o.geometry !== geoCache.plain && o.geometry !== geoCache.detailed) o.geometry.dispose();
+    if (o.geometry && o.geometry !== geoCache.plain && o.geometry !== geoCache.detailed && !o.geometry.userData.cached) o.geometry.dispose();
   });
 }
 
@@ -397,7 +456,7 @@ function buildBoard(state) {
 
 // Particle pool (bounded; tier controls count; never intercepts raycasts).
 function buildParticles() {
-  const max = 1200;
+  const max = Math.round(PARTICLE_BUDGET.high * 3); // budget sparks ≤ 1.5 × level scaling ≤ 2
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(max * 3);
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -427,7 +486,9 @@ function styleParticles() {
 const WARM = new THREE.Color(0xffe6b0);
 function spawnParticles(x, y, z, n, spread, colorIdx) {
   if (reducedMotion || !particlePool) return;
-  n = Math.min(n, PARTICLE_BUDGET[q.particles] - particlePool.alive.length);
+  // Counts and cap × the preset budget's sparks factor.
+  const k = q.budget.sparks;
+  n = Math.min(Math.round(n * k), Math.min(particlePool.max, Math.round(PARTICLE_BUDGET[q.particles] * k)) - particlePool.alive.length);
   const base = colorIdx != null ? new THREE.Color(palette[colorIdx % palette.length]) : WARM;
   for (let i = 0; i < n; i++) {
     const c = decorRng() < 0.35 ? WARM : base;
@@ -442,7 +503,8 @@ function spawnParticles(x, y, z, n, spread, colorIdx) {
 
 // Ambient dust motes drifting through the lamp light (background: animated).
 function buildDust() {
-  const n = 70;
+  if (dust) { scene.remove(dust.points); dust.points.geometry.dispose(); dust.points.material.dispose(); dust = null; }
+  const n = q.budget.dust; // preset budget
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(n * 3);
   const seed = [];
@@ -603,7 +665,7 @@ export function init(canvasEl, opts) {
   renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   detectGpu();
-  q = resolve(savedGfx, detected);
+  q = resolve(savedGfx, detected, level);
   renderer.shadowMap.enabled = SHADOW_MAP[q.shadows] > 0;
 
   scene = new THREE.Scene();
@@ -674,7 +736,11 @@ function detectGpu() {
   const mobile = typeof navigator !== 'undefined' &&
     ((navigator.maxTouchPoints > 0 && typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) ||
      /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || ''));
-  detected = detectPreset(gpuName, { mobile });
+  // StarHermit hardware level → Auto preset (SwiftShader = level 0 → Low; phones cap at Balanced).
+  const G = globalThis.StarHermitGpu;
+  const system = G ? G.detectSystem() : {};
+  level = detectLevel(gpuName, { ...system, mobile: !!system.mobile || mobile });
+  detected = presetForLevel(level);
 }
 
 // Key light shadow box fitted to the peg row and the mat, not the whole table.
@@ -753,6 +819,8 @@ export function setPalette(palId) {
   const next = PALETTES[palId] || PALETTES.default;
   if (next === palette) return;
   palette = next;
+  // Merged (Low) loops carry the palette in their vertex colours.
+  for (const k of Object.keys(geoCache)) if (k.startsWith('merged-')) { geoCache[k].dispose(); delete geoCache[k]; }
   if (ready()) applyTheme(theme); // spools and loop materials carry palette colours
   if (ready() && currentState) {
     for (const rec of loopPool) rec.colorIdx = -1; // force rebuild
@@ -775,7 +843,8 @@ export function setQuality(tier) {
 export function setGraphics(saved) {
   const prev = q;
   savedGfx = Object.assign({}, saved || {});
-  q = resolve(savedGfx, detected);
+  q = resolve(savedGfx, detected, level);
+  const pb = prev.budget || {}, b = q.budget;
   adaptiveScale = 1;
   frameTimes = [];
   postKey = null; // rebuild the post chain on the next frame
@@ -797,7 +866,12 @@ export function setGraphics(saved) {
   }
   applyReflections();
   if (prev.particles !== q.particles) styleParticles();
-  if (prev.detail !== q.detail) {
+  if (pb.dust !== b.dust && dust) buildDust();
+  if (prev.detail !== q.detail || pb.material !== b.material || pb.segments !== b.segments || pb.yarn !== b.yarn || pb.merge !== b.merge) {
+    // Asset variants: drop cached loop geometry so tori and merged loops follow the new LOD.
+    for (const g of Object.values(geoCache)) g.dispose();
+    geoCache = {};
+    if (currentState) for (const rec of loopPool) rec.colorIdx = -1;
     applyTheme(theme); // rebuilds environment, materials and board at the new detail
   }
   // Materials pick up shadow-map changes on recompile.
@@ -813,6 +887,7 @@ export function graphicsInfo(t) {
   const px = [Math.round(lastSize[0] * pixelRatio), Math.round(lastSize[1] * pixelRatio)];
   return {
     gpu: gpuName || 'unknown GPU',
+    level,
     detected,
     resolved: q,
     summary: describe(q, ready() ? px : null, t),
@@ -878,7 +953,7 @@ function buildPost(w, h) {
     c.setSize(w, h);
     c.addPass(new RenderPass(scene, camera));
     if (q.ao !== 'off') {
-      const ao = new GTAOPass(scene, camera, pw, ph);
+      const ao = atScale(new GTAOPass(scene, camera, pw, ph), q.budget.aoRes);
       ao.output = GTAOPass.OUTPUT.Default;
       ao.blendIntensity = 0.75;
       ao.updateGtaoMaterial({ radius: 0.5, distanceExponent: 1.4, thickness: 1.0, scale: 1.0, samples: q.ao === 'high' ? 16 : 8 });
@@ -887,7 +962,7 @@ function buildPost(w, h) {
     }
     if (q.bloom === 'on') {
       // High threshold: only sparks, glints on brass and the lift ring bloom.
-      c.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.5, 0.9));
+      c.addPass(atScale(new UnrealBloomPass(new THREE.Vector2(w, h), 0.32, 0.5, 0.9), q.budget.bloomRes));
     }
     if (q.grade === 'on') {
       gradePass = new ShaderPass(GradeShader);

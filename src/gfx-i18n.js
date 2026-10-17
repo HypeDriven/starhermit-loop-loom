@@ -5,7 +5,7 @@
 // still en-US only; this table is chosen from navigator.language.
 
 const en = {
-  settings: 'Settings', graphics: 'Graphics', quality: 'Quality', auto: 'Auto (detected: {tier})',
+  settings: 'Settings', graphics: 'Graphics', quality: 'Quality', level: 'Level {level}', auto: 'Auto (detected: {tier})',
   renderScale: 'Render scale', adaptive: 'Adaptive resolution', showFps: 'Show frame rate',
   fromPreset: 'From preset ({tier})', postFailed: 'Post-processing is unavailable on this device, so the game renders without it.',
   noWebgl: '3D is unavailable, so graphics settings have no effect.',
@@ -21,7 +21,7 @@ const enGB = {
 };
 
 const es = {
-  settings: 'Ajustes', graphics: 'Gráficos', quality: 'Calidad', auto: 'Automática (detectada: {tier})',
+  settings: 'Ajustes', graphics: 'Gráficos', quality: 'Calidad', level: 'Nivel {level}', auto: 'Automática (detectada: {tier})',
   renderScale: 'Escala de renderizado', adaptive: 'Resolución adaptativa', showFps: 'Mostrar fotogramas por segundo',
   fromPreset: 'Según el preajuste ({tier})', postFailed: 'El posprocesado no está disponible en este dispositivo, así que el juego se muestra sin él.',
   noWebgl: 'El 3D no está disponible, así que los ajustes gráficos no tienen efecto.',
@@ -34,7 +34,7 @@ const es = {
 const es419 = { ...es, settings: 'Configuración', cat: { ...es.cat, grade: 'Gradación de color' } };
 
 const de = {
-  settings: 'Einstellungen', graphics: 'Grafik', quality: 'Qualität', auto: 'Automatisch (erkannt: {tier})',
+  settings: 'Einstellungen', graphics: 'Grafik', quality: 'Qualität', level: 'Stufe {level}', auto: 'Automatisch (erkannt: {tier})',
   renderScale: 'Renderskalierung', adaptive: 'Adaptive Auflösung', showFps: 'Bildrate anzeigen',
   fromPreset: 'Aus Voreinstellung ({tier})', postFailed: 'Nachbearbeitung ist auf diesem Gerät nicht verfügbar, daher wird ohne sie gerendert.',
   noWebgl: '3D ist nicht verfügbar, daher haben Grafikeinstellungen keine Wirkung.',
@@ -45,7 +45,7 @@ const de = {
 };
 
 const fr = {
-  settings: 'Paramètres', graphics: 'Graphismes', quality: 'Qualité', auto: 'Auto (détectée : {tier})',
+  settings: 'Paramètres', graphics: 'Graphismes', quality: 'Qualité', level: 'Niveau {level}', auto: 'Auto (détectée : {tier})',
   renderScale: 'Échelle de rendu', adaptive: 'Résolution adaptative', showFps: 'Afficher la fréquence d’images',
   fromPreset: 'Selon le préréglage ({tier})', postFailed: 'Le post-traitement n’est pas disponible sur cet appareil ; le jeu s’affiche sans.',
   noWebgl: 'La 3D n’est pas disponible ; les réglages graphiques sont sans effet.',
@@ -58,7 +58,7 @@ const fr = {
 const frCA = { ...fr, settings: 'Réglages', cat: { ...fr.cat, grade: 'Correction des couleurs' } };
 
 const ptBR = {
-  settings: 'Configurações', graphics: 'Gráficos', quality: 'Qualidade', auto: 'Automática (detectada: {tier})',
+  settings: 'Configurações', graphics: 'Gráficos', quality: 'Qualidade', level: 'Nível {level}', auto: 'Automática (detectada: {tier})',
   renderScale: 'Escala de renderização', adaptive: 'Resolução adaptativa', showFps: 'Mostrar taxa de quadros',
   fromPreset: 'Do predefinido ({tier})', postFailed: 'O pós-processamento não está disponível neste dispositivo, então o jogo é exibido sem ele.',
   noWebgl: 'O 3D não está disponível, então as configurações gráficas não têm efeito.',
@@ -69,7 +69,7 @@ const ptBR = {
 };
 
 const it = {
-  settings: 'Impostazioni', graphics: 'Grafica', quality: 'Qualità', auto: 'Automatica (rilevata: {tier})',
+  settings: 'Impostazioni', graphics: 'Grafica', quality: 'Qualità', level: 'Livello {level}', auto: 'Automatica (rilevata: {tier})',
   renderScale: 'Scala di rendering', adaptive: 'Risoluzione adattiva', showFps: 'Mostra frequenza fotogrammi',
   fromPreset: 'Da preimpostazione ({tier})', postFailed: 'La post-elaborazione non è disponibile su questo dispositivo, quindi il gioco viene mostrato senza.',
   noWebgl: 'Il 3D non è disponibile, quindi le impostazioni grafiche non hanno effetto.',
