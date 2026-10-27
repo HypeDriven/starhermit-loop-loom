@@ -131,7 +131,7 @@ write('landscape-journey.play', 'Landscape phone: Journey stage 1 by keys to the
   'until 300 Loom complete!', 'frames 30', 'expect Total',
 ]);
 // The 3D pegs: lessons 1 and 2 by clicks on the pegs (the four pegs of the lessons sit at 31 %, 44 %, 56 % and
-// 68 % of the 960 × 540 frame). The 1.18.0 runtime's play scripts have no drag step: tools/browser-play.mjs drags.
+// 68 % of the 960 × 540 frame). The 1.19.1 runtime's play scripts have no drag step: tools/browser-play.mjs drags.
 const PEG_X = ['31%', '44%', '56%', '68%'];
 write('pointer-3d.play', 'The 3D pegs: lessons 1 and 2 by clicks on the pegs.', [
   'until 300 =Play', 'frames 20',
