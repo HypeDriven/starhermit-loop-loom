@@ -2,8 +2,7 @@
 // Keys are the US-English source strings (see tests/i18n-keys.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DICTS, LOCALES, T, setLocale } from '../src/i18n.js';
-import { gfxStrings } from '../src/gfx-i18n.js';
+import { DICTS, LOCALES, T, setLocale, pickLocale } from '../src/i18n.js';
 import { shStrings } from '../src/sh-strings.js';
 import { ALL } from './i18n-keys.mjs';
 
@@ -30,12 +29,16 @@ test('no locale carries keys that no longer exist', () => {
   }
 });
 
-test('Graphics and StarHermit strings exist in all nine locales', () => {
-  for (const locale of LOCALES) {
-    assert.ok(gfxStrings(locale).graphics, locale);
-    assert.ok(shStrings([locale]).signIn, locale);
-  }
-  assert.notEqual(gfxStrings('de-DE').graphics, 'Graphics');
+test('StarHermit account strings exist in all nine locales', () => {
+  for (const locale of LOCALES) assert.ok(shStrings([locale]).signIn && shStrings([locale]).lbRank.includes('{rank}'), locale);
+});
+
+test('the engine client\'s new strings are found and runtime language tags map to a locale', () => {
+  for (const k of ['Audio & graphics', 'Keyboard bindings', 'Peg {n}: {loops}', 'Loop lifted', 'Open objective panel']) assert.ok(ALL.has(k), k);
+  assert.equal(pickLocale('es-MX'), 'es-419');
+  assert.equal(pickLocale('fr-ca'), 'fr-CA');
+  assert.equal(pickLocale('de'), 'de-DE');
+  assert.equal(pickLocale('ja-JP'), 'en-US');
 });
 
 test('rich-text keys keep their inline markup in every locale', () => {

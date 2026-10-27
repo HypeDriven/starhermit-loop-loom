@@ -1,22 +1,20 @@
 {
   "name": "loop-loom",
   "version": "1.0.0",
-  "description": "Loop Loom — ordering puzzle in a textile atelier.",
+  "private": true,
+  "description": "Loop Loom — an ordering puzzle in a textile atelier, on the StarHermit engine.",
   "type": "module",
-  "main": "server.js",
   "scripts": {
-    "build": "esbuild src/main.js --bundle --outfile=lib/bundle.js --format=esm --minify --legal-comments=none",
-    "test": "npm run build && node --test tests/*.test.js",
-    "test:e2e": "node tests/e2e.mjs"
+    "test": "npm run test:unit && npm run test:native",
+    "test:unit": "node --test tests/*.test.js",
+    "test:native": "node tests/native.mjs",
+    "test:browser": "node tools/browser-play.mjs .",
+    "package": "node tools/package-web.mjs",
+    "css": "node tools/css.mjs",
+    "plays": "node tools/gen-plays.mjs",
+    "serve": "node server.js"
   },
-  "keywords": [],
-  "author": "",
   "license": "PolyForm-Noncommercial-1.0.0",
-  "dependencies": {
-    "@types/three": "^0.185.4",
-    "esbuild": "^0.28.2",
-    "three": "^0.169.0"
-  },
   "devDependencies": {
     "playwright-core": "^1.62.1"
   }

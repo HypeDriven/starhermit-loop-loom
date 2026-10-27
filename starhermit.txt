@@ -1,9 +1,27 @@
 name=Loop Loom
 description=Move matching yarn loops between pegs until every peg holds a single color.
-launch=index.html
 owner=2712e04e-461b-4d23-81ae-e40b429128a8
 server=score-script.js
 cover=cover.jpg
+
+# StarHermit engine script game: one package, played natively by the
+# StarHermit client and in browsers by the engine's web runtime. Browsers open
+# launch=index.html, the loader `npm run package` writes (it pins the engine
+# on wiki.starhermit.com by hash; never edit it). Re-run `npm run package`
+# after every change and commit index.html + starhermit-files.json.
+launch=index.html
+engine.api=1
+engine.entry=native/main.ts
+engine.version=1.18.0
+engine.minor=20
+engine.capabilities=platform,storage,clipboard
+
+# Keyboard controls (players rebind keys and pads in the runtime's Options).
+# The arrows move the peg focus (left/right wrap, up/down stop at the ends),
+# Confirm lifts the focused peg's top group or drops the lifted group on it,
+# Cancel lowers a lifted group (or pauses with nothing lifted). Pegs and every
+# button are also played with the pointer (tap, or drag from peg to peg),
+# touch, or Tab and Enter.
 control.left=ArrowLeft | Previous peg
 control.right=ArrowRight | Next peg
 control.up=ArrowUp | Previous peg (no wrap)
@@ -14,3 +32,20 @@ control.undo=KeyU | Undo
 control.hint=KeyH | Hint
 control.pause=KeyP | Pause
 control.camera=KeyR | Reset camera
+engine.group.left=Pegs
+engine.group.undo=Assists
+engine.group.pause=Round
+
+# Gamepad defaults: the D-pad or left stick moves the peg focus, South lifts
+# and drops, East cancels, West undoes, North takes a hint, Start pauses, the
+# right stick press resets the camera.
+engine.gamepad.left=DpadLeft+LeftStickLeft
+engine.gamepad.right=DpadRight+LeftStickRight
+engine.gamepad.up=DpadUp
+engine.gamepad.down=DpadDown
+engine.gamepad.confirm=South
+engine.gamepad.cancel=East
+engine.gamepad.undo=West
+engine.gamepad.hint=North
+engine.gamepad.pause=Start
+engine.gamepad.camera=RightStickPress

@@ -103,6 +103,11 @@ export function saveProgress(data) {
 // Round session
 // ---------------------------------------------------------------------------
 
+// The round clock (ms): the wall clock by default; the engine client drives it
+// from its fixed simulation steps so rounds and play scripts are deterministic.
+let clock = () => Date.now();
+export function setClock(fn) { clock = typeof fn === 'function' ? fn : () => Date.now(); }
+
 export class Session {
   // record: a content record from content.js. opts: { mode, assists }
   constructor(record, opts) {
@@ -117,7 +122,7 @@ export class Session {
     this.seenCmdIds = new Set();
     this.snapshots = [];      // undo stack of prior states
     this.hashTrail = [rules.hashState(this.state)];
-    this.startedAt = Date.now();
+    this.startedAt = clock();
     this.endedAt = null;
     this.result = null;
     this.tutorial = record.tutorial ? { step: 0 } : null;
@@ -173,11 +178,11 @@ export class Session {
     return { ok: false, reason: 'unknown-command' };
   }
 
-  elapsedMs() { return (this.endedAt || Date.now()) - this.startedAt; }
+  elapsedMs() { return (this.endedAt || clock()) - this.startedAt; }
 
   finish() {
     if (this.endedAt) return;
-    this.endedAt = Date.now();
+    this.endedAt = clock();
     this.result = rules.scoreComponents(this.state, this.record.par, this.elapsedMs());
     this.result.sessionId = getSessionId();
     this.result.mode = this.mode;
@@ -218,7 +223,7 @@ export class Session {
     s.seenCmdIds = new Set(s.commands.map((c) => c.id));
     s.snapshots = (snap.snapshots || []).map((x) => rules.deserialize(x));
     s.hashTrail = snap.hashTrail || [rules.hashState(s.state)];
-    s.startedAt = snap.startedAt || Date.now();
+    s.startedAt = snap.startedAt || clock();
     s.tutorial = snap.tutorial || null;
     if (s.state.status !== 'active') s.finish();
     return s;
@@ -419,5 +424,5 @@ export default {
   Session, DEFAULT_SETTINGS, loadSettings, saveSettings, ACHIEVEMENTS,
   loadProgress, saveProgress, saveSnapshot, loadSnapshot, clearSnapshot,
   recordScore, getScores, exportDoc, importDoc, mergeDocs, checkAchievements,
-  validateReplay, getSessionId, track,
+  validateReplay, getSessionId, track, setClock,
 };

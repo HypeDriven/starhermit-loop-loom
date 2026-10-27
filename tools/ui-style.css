@@ -1,0 +1,112 @@
+/* Loop Loom — the browser build's index.html stylesheet rewritten class-based
+   for the engine's UI (`npm run css` converts it into assets/ui-style.json).
+   Element selectors, ids, attribute selectors and @media do not convert:
+   every widget names its classes, and the breakpoints (desktop ≥ 1024 px with
+   rails, portrait phone ≤ 700 px, landscape phone ≤ 500 px tall) are layouts
+   picked in native/screens.ts. High contrast, larger text and reduced motion
+   are the runtime's options; native/style.ts swaps the high-contrast tokens. */
+
+:root {
+  --bg: #1a1d24;
+  --panel: #1c2028f5;
+  --panel2: #22262f;
+  --text: #eef1f5;
+  --soft: #cfd6df;
+  --dim: #9aa4b2;
+  --accent: #e8c07a;
+  --btn: #3b6ea5;
+  --btn-hover: #4a7db4;
+  --line: #3a4150;
+  --danger: #c8553d;
+  --good: #58a05a;
+  --done: #2e5d34;
+  --lifted: #333a28;
+}
+
+* { box-sizing: border-box; }
+
+/* ------------------------------------------------------------- text */
+.h1 { color: var(--text); font-size: 28px; font-weight: 700; letter-spacing: 0.5px; }
+.h2 { color: var(--accent); font-size: 18px; font-weight: 700; }
+.p { color: var(--soft); font-size: 16px; }
+.meta { color: var(--dim); font-size: 13px; }
+.lb { color: var(--soft); font-size: 13px; }
+.rail-h { color: var(--accent); font-size: 15px; font-weight: 700; }
+.rail-p { color: var(--text); font-size: 14px; }
+.rail-li { color: var(--text); font-size: 14px; }
+.rail-dim { color: var(--dim); font-size: 14px; }
+.rail-on { color: var(--accent); font-size: 14px; }
+.hud-text { color: var(--text); font-size: 14px; }
+.hud-small { color: var(--text); font-size: 12px; }
+.score-k { color: var(--text); font-size: 15px; }
+.score-v { color: var(--accent); font-size: 15px; font-weight: 700; }
+.badge-text { color: var(--accent); font-size: 13px; }
+.caption-text { color: #ffffff; font-size: 14px; }
+.toast-text { color: var(--text); font-size: 16px; }
+.set-label { color: var(--text); font-size: 16px; }
+.help-li { color: var(--soft); font-size: 15px; }
+
+/* ------------------------------------------------------------- panels */
+.overlay {
+  background: var(--panel); border-radius: 14px; padding: 22px 26px;
+  box-shadow: 0 12px 40px #00000080;
+}
+.backdrop {
+  background: radial-gradient(farthest-corner at 50% 45%, #0a080661 0%, #0a0806b8 65%, #0a0806e6 100%), url(../assets/atelier-backdrop.webp) center / cover, #17130f;
+}
+.backdrop-plain { background: #000000; }
+.hud-card { background: var(--panel); border-radius: 10px; padding: 7px 12px; }
+.rail { background: var(--panel); border-radius: 12px; padding: 14px; }
+.mirror { background: var(--panel); border-radius: 12px; padding: 8px 10px; }
+.caption { background: #000000bf; border-radius: 8px; padding: 4px 14px; }
+.toast { background: var(--panel); border: 1px solid var(--accent); border-radius: 10px; padding: 8px 16px; }
+.badge { background: var(--panel2); border: 1px solid var(--accent); border-radius: 20px; padding: 3px 12px; }
+.score-row { border-radius: 0; padding: 2px 0; }
+.set-row { border-radius: 0; padding: 5px 0; }
+
+/* ------------------------------------------------------------- buttons */
+.btn {
+  min-height: 44px; min-width: 44px; padding: 10px 18px; border-radius: 9px;
+  background: var(--btn); color: #ffffff; font-size: 16px; text-align: center;
+}
+.btn:hover { background: var(--btn-hover); }
+.btn:disabled { opacity: 0.45; }
+.btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn2 {
+  min-height: 44px; min-width: 44px; padding: 10px 18px; border-radius: 9px;
+  background: var(--panel2); color: var(--text); border: 1px solid var(--line); font-size: 16px; text-align: center;
+}
+.btn2:hover { background: #2c313c; }
+.btn2:disabled { opacity: 0.45; }
+.btn2:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.ghost {
+  min-height: 44px; min-width: 44px; padding: 10px 18px; border-radius: 9px;
+  background: #00000000; color: var(--dim); font-size: 16px; text-align: center;
+}
+.ghost:hover { background: #ffffff14; }
+.ghost:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.tray-btn {
+  min-height: 44px; min-width: 0; padding: 8px 4px; border-radius: 9px;
+  background: var(--panel2); color: var(--text); border: 1px solid var(--line); font-size: 14px; text-align: center;
+}
+.tray-btn:hover { background: #2c313c; }
+.tray-btn:disabled { opacity: 0.45; }
+.tray-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.stage {
+  min-height: 44px; min-width: 0; padding: 8px 4px; border-radius: 9px;
+  background: var(--btn); color: #ffffff; font-size: 16px; text-align: center;
+}
+.stage:hover { background: var(--btn-hover); }
+.stage:disabled { opacity: 0.4; }
+.stage:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.stage-done {
+  min-height: 44px; min-width: 0; padding: 8px 4px; border-radius: 9px;
+  background: var(--done); color: #ffffff; font-size: 16px; text-align: center;
+}
+.stage-done:hover { background: #3a6e40; }
+.stage-done:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* The accessible peg mirror's buttons (index.html .peg-btn). */
+.peg { background: var(--panel2); border: 2px solid var(--line); border-radius: 9px; }
+.peg-legal { background: var(--panel2); border: 2px solid var(--good); border-radius: 9px; }
+.peg-sel { background: var(--lifted); border: 2px solid var(--accent); border-radius: 9px; }

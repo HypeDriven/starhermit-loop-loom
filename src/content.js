@@ -75,8 +75,11 @@ function buildRecord(id, seed, cfg, extra) {
 // Journey — 48 authored (deterministically generated + validated) stages.
 // ---------------------------------------------------------------------------
 
+// Built on first use (each stage BFS-solves its board), so loading the module
+// stays cheap on slow interpreters; the records are identical either way.
 const JOURNEY = [];
-for (let i = 0; i < 48; i++) {
+function journeyStage(i) {
+  if (JOURNEY[i]) return JOURNEY[i];
   const cfg = stageConfig(i);
   const seed = fnv1a('journey:' + i + ':v' + CONTENT_VERSION);
   const rec = buildRecord('journey-' + (i + 1), seed, cfg, {
@@ -85,10 +88,11 @@ for (let i = 0; i < 48; i++) {
   });
   if (cfg.mastery) rec.moveLimit = rec.par + 2 + Math.floor(rec.par / 4);
   rec.difficulty = 1 + Math.round(cfg.t * 9);
-  JOURNEY.push(rec);
+  JOURNEY[i] = rec;
+  return rec;
 }
-export const journeyCount = JOURNEY.length;
-export function getJourneyStage(i) { return JOURNEY[Math.max(0, Math.min(JOURNEY.length - 1, i))]; }
+export const journeyCount = 48;
+export function getJourneyStage(i) { return journeyStage(Math.max(0, Math.min(journeyCount - 1, i | 0))); }
 
 // ---------------------------------------------------------------------------
 // Learn — interactive lessons, one rule at a time; player must perform it.
@@ -251,7 +255,7 @@ export function validateContent(rec) {
 export function validateAll() {
   const report = [];
   const check = (rec) => { const r = validateContent(rec); report.push({ id: rec.id, ok: r.ok, errors: r.errors }); };
-  JOURNEY.forEach(check);
+  for (let i = 0; i < journeyCount; i++) check(journeyStage(i));
   for (let i = 0; i < LESSONS.length; i++) check(getLesson(i));
   for (let i = 0; i < CHALLENGES.length; i++) check(getChallenge(i, 0));
   check(getDaily(Math.floor(Date.UTC(2026, 0, 1) / 86400000)));
