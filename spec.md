@@ -15,7 +15,7 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 | Genre | Single-player ordering / sorting puzzle (stack-transfer family) |
 | Players | 1, with asynchronous score comparison |
 | Session | 40 s (Learn lesson) to ~4 min (difficulty 10 Practice board); one Journey stage ≈ 1–2 min |
-| Platforms | StarHermit engine 1.19.1 (host API 1.21, `engine.minor=20`): natively in the StarHermit client (Windows, Linux) and in browsers through the engine's web runtime; portrait and landscape; keyboard, mouse, touch, gamepad |
+| Platforms | StarHermit engine 1.22.0 (host API 1.21, `engine.minor=20`): natively in the StarHermit client (Windows, Linux) and in browsers through the engine's web runtime; portrait and landscape; keyboard, mouse, touch, gamepad |
 | Rendering | `starhermit:scene` (three.js r185 conventions) with the engine's post effects; the menus, HUD and the accessible peg mirror on `starhermit:ui` |
 | Build | A script game: `engine.entry=native/main.ts` (TypeScript, type-checked with `tsc`), no bundler; `npm run package` writes the web loader `index.html` and the file index `starhermit-files.json` |
 
@@ -23,7 +23,7 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 
 | Path | Owns |
 |---|---|
-| `starhermit.txt` | Manifest: name, owner, `server=score-script.js`, cover, engine pin (1.19.1, minor 20), capabilities (platform, storage, clipboard), `control.*` keys, `engine.group.*`, `engine.gamepad.*` |
+| `starhermit.txt` | Manifest: name, owner, `server=score-script.js`, cover, engine pin (1.22.0, minor 20), capabilities (platform, storage, clipboard), `control.*` keys, `engine.group.*`, `engine.gamepad.*` |
 | `native/main.ts` | Entry module: app state machine, screen routing, round lifecycle (lift, drop, refusals, undo, hint, Learn step gate, Swift Shuttle timer), achievements and local boards, score posting, input (actions, pointer/touch on the 3D pegs), fixed-step clock, lifecycle |
 | `native/screens.ts` | Every screen on `starhermit:ui`: backdrop, title, modes, setup, play (HUD, rails / drawers, peg mirror, tray), pause, settings, results, help, caption line, toast; the responsive layouts |
 | `native/render.ts` | The atelier on `starhermit:scene`: table, mat, spools, strands, pegs, loops, stitch markers, ground rings, sparks, dust, lamp shimmer, tweens, shake, parallax, camera fit, peg picking, per-level look |
@@ -419,7 +419,7 @@ titles, achievements and captions — is English data translated at display time
 ## 12. StarHermit integration
 
 `starhermit.txt`: `name`, `description`, `owner`, `server=score-script.js`, `cover=cover.jpg`,
-`launch=index.html`, the engine pin (`engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.19.1`,
+`launch=index.html`, the engine pin (`engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.22.0`,
 `engine.minor=20`), `engine.capabilities=platform,storage,clipboard`, one `control.<action>` line per keyboard
 action (left, right, up, down, confirm, cancel, undo, hint, pause, camera), their groups and gamepad
 defaults.
@@ -531,7 +531,7 @@ theme colours and the `#17130f` backdrop ground stay in place and nothing else c
   backdrop's lamp-breathing glow, and the DOM-only fallbacks (no-WebGL compatibility screen). Guests' old
   browser localStorage progress cannot migrate; signed-in players' cloud saves do.
 - **Native play scripts** run phone layouts at scale 1: render checks with a `# viewport …@2`/`@3` line fail
-  the runtime's trusted-screen probe for any game (reported); the browser check covers DPR 3. The 1.19.1
+  the runtime's trusted-screen probe for any game (reported); the browser check covers DPR 3. The 1.22.0
   play scripts have no drag step, so drags are checked in the browser.
 - **Signed-in paths** (cloud merge, foreign save, KV migration, score posting) are covered by unit tests and
   the shared platform code, not live-tested here.
