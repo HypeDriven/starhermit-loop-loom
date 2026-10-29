@@ -15,7 +15,7 @@
 // RoomEnvironment(renderer) + PMREM give the reflections at the game's own
 // environmentIntensity 0.38 (r169 let scene.environment override the
 // materials' envMapIntensity, so materials keep 1); the post chain (GTAO,
-// UnrealBloom threshold 0.9, the GradeShader in display space, FXAA / SMAA /
+// UnrealBloom threshold 0.9, the GradeShader on the linear buffer before OutputPass, FXAA / SMAA /
 // MSAA) is renderer.ao / bloom / grade / antialias; the fitted orthographic
 // shadow box is render.js's; MeshPhysicalMaterial's sheen
 // on the yarn is not drawn by the engine (the yarn keeps its twist texture
@@ -581,11 +581,12 @@ export function applyLook(next: Look): void {
     denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
   };
   // High threshold: only sparks, glints on brass and the lift ring bloom.
-  renderer.bloom = next.bloom ? { strength: 0.32, radius: 0.5, threshold: 0.9, resolution: next.budget.bloomRes } : null;
-  // render.js GradeShader (display space): a gentle S-curve, +10 % saturation, warm highlights / cool shadows,
-  // the 0.28 vignette.
+  // r169 page: UnrealBloomPass 0.32 → 0.32² at minor 29 (r185 bloom).
+  renderer.bloom = next.bloom ? { strength: 0.32 * 0.32, radius: 0.5, threshold: 0.9, resolution: next.budget.bloomRes } : null;
+  // render.js GradeShader (before OutputPass, so on linear light): a 0.22 S-curve, +10 % saturation, warm
+  // highlights / cool shadows, the s * 0.97 + 0.02 lift with over-range light kept, the 0.28 vignette.
   renderer.grade = next.grade ? {
-    space: "display", contrast: 0.11, saturation: 1.1,
+    space: "linear", contrast: 0.22, saturation: 1.1, levels: [0.97, 0.02], overRange: "keep",
     shadows: [0.97, 0.98, 1.04], highlights: [1.05, 1.0, 0.94], split: [0.2, 0.8],
     vignette: { amount: 0.28, inner: 0.32, outer: 0.85, scale: [1, 0.9] },
   } : null;
