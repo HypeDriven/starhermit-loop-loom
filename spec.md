@@ -15,7 +15,7 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 | Genre | Single-player ordering / sorting puzzle (stack-transfer family) |
 | Players | 1, with asynchronous score comparison |
 | Session | 40 s (Learn lesson) to ~4 min (difficulty 10 Practice board); one Journey stage ≈ 1–2 min |
-| Platforms | StarHermit engine 1.24.0 (host API 1.21, `engine.minor=20`): natively in the StarHermit client (Windows, Linux) and in browsers through the engine's web runtime; portrait and landscape; keyboard, mouse, touch, gamepad |
+| Platforms | StarHermit engine 1.24.0 (host API 1.26, `engine.minor=26`): natively in the StarHermit client (Windows, Linux) and in browsers through the engine's web runtime; portrait and landscape; keyboard, mouse, touch, gamepad |
 | Rendering | `starhermit:scene` (three.js r185 conventions) with the engine's post effects; the menus, HUD and the accessible peg mirror on `starhermit:ui` |
 | Build | A script game: `engine.entry=native/main.ts` (TypeScript, type-checked with `tsc`), no bundler; `npm run package` writes the web loader `index.html` and the file index `starhermit-files.json` |
 
@@ -23,7 +23,7 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 
 | Path | Owns |
 |---|---|
-| `starhermit.txt` | Manifest: name, owner, `server=score-script.js`, cover, engine pin (1.24.0, minor 20), capabilities (platform, storage, clipboard), `control.*` keys, `engine.group.*`, `engine.gamepad.*` |
+| `starhermit.txt` | Manifest: name, owner, `server=score-script.js`, cover, engine pin (1.24.0, minor 26), capabilities (platform, storage, clipboard), `control.*` keys, `engine.group.*`, `engine.gamepad.*` |
 | `native/main.ts` | Entry module: app state machine, screen routing, round lifecycle (lift, drop, refusals, undo, hint, Learn step gate, Swift Shuttle timer), achievements and local boards, score posting, input (actions, pointer/touch on the 3D pegs), fixed-step clock, lifecycle |
 | `native/screens.ts` | Every screen on `starhermit:ui`: backdrop, title, modes, setup, play (HUD, rails / drawers, peg mirror, tray), pause, settings, results, help, caption line, toast; the responsive layouts |
 | `native/render.ts` | The atelier on `starhermit:scene`: table, mat, spools, strands, pegs, loops, stitch markers, ground rings, sparks, dust, lamp shimmer, tweens, shake, parallax, camera fit, peg picking, per-level look |
@@ -311,7 +311,7 @@ is ±0.06/0.04 units of camera offset.
 loops jump to their exact positions and the game is fully playable.
 
 **Graphics.** ACES filmic tone mapping (exposure 1.05), a warm key directional light (the engine's light
-units: three r169 intensities ÷ π) with soft shadows over the board (`shadow.distance` 20, radius 3), a
+units: three r169 intensities as the page set them) with soft shadows over the board (render.js's fitted box, radius 3), a
 hemisphere fill and a cool rim, and the theme colour as background and fog. The look follows the runtime's
 graphics level (Options › Graphics: Auto from the device, or a chosen level; render scale, adaptive
 resolution, the frame-rate limit and readout are the runtime's): `native/quality.ts` maps its four tiers onto
@@ -420,7 +420,7 @@ titles, achievements and captions — is English data translated at display time
 
 `starhermit.txt`: `name`, `description`, `owner`, `server=score-script.js`, `cover=cover.jpg`,
 `launch=index.html`, the engine pin (`engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.24.0`,
-`engine.minor=20`), `engine.capabilities=platform,storage,clipboard`, one `control.<action>` line per keyboard
+`engine.minor=26`), `engine.capabilities=platform,storage,clipboard`, one `control.<action>` line per keyboard
 action (left, right, up, down, confirm, cancel, undo, hint, pause, camera), their groups and gamepad
 defaults.
 

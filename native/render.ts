@@ -10,14 +10,14 @@
 // to the peg row above the bottom HUD band with a decaying shake and pointer
 // parallax. Rendering reads rules state and never writes it.
 //
-// From three.js: light intensities are r169's ÷ π (the engine's
-// convention); canvas textures are starhermit:canvas OffscreenCanvases;
+// From three.js r169 (engine.minor 26): light intensities and shadow box as the page set them (the engine's
+// r155+ units); canvas textures are starhermit:canvas OffscreenCanvases;
 // RoomEnvironment(renderer) + PMREM give the reflections at the game's own
 // environmentIntensity 0.38 (r169 let scene.environment override the
 // materials' envMapIntensity, so materials keep 1); the post chain (GTAO,
 // UnrealBloom threshold 0.9, the GradeShader in display space, FXAA / SMAA /
 // MSAA) is renderer.ao / bloom / grade / antialias; the fitted orthographic
-// shadow box is the engine's `shadow.distance`; MeshPhysicalMaterial's sheen
+// shadow box is render.js's; MeshPhysicalMaterial's sheen
 // on the yarn is not drawn by the engine (the yarn keeps its twist texture
 // and bump). Peg picking intersects the camera ray with each peg's pick
 // cylinder by hand (the old invisible pick meshes). Adaptive resolution, the
@@ -25,7 +25,7 @@
 import {
   ACESFilmicToneMapping, AdditiveBlending, BoxGeometry, BufferAttribute, BufferGeometry, CanvasTexture, CatmullRomCurve3, Color,
   ConeGeometry, CylinderGeometry, DirectionalLight, DoubleSide, Fog, Group, HemisphereLight, Mesh, MeshBasicMaterial,
-  MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, OctahedronGeometry, PerspectiveCamera, PMREMGenerator, Points,
+  MeshLambertMaterial, MeshPhysicalMaterial, MeshStandardMaterial, OctahedronGeometry, OrthographicCamera, PerspectiveCamera, PMREMGenerator, Points,
   PointsMaterial, Raycaster, RepeatWrapping, RingGeometry, RoomEnvironment, SphereGeometry, SRGBColorSpace, TextureLoader,
   TorusGeometry, TubeGeometry, Vector2, Vector3, mergeGeometries, renderer, scene,
   type Material, type Object3D, type Texture,
@@ -177,21 +177,32 @@ function brassMaterial(): Mat {
 
 // -- lights ----------------------------------------------------------------------------------------
 let keyLight: DirectionalLight | null = null;
-let keyBase = 2.2 / PI;
+let keyBase = 2.2;
 const lights: Object3D[] = [];
+/** Key light shadow box fitted to the peg row and the mat, not the whole table (render.js fitShadow). */
+function fitShadow(): void {
+  if (!keyLight) return;
+  const halfW = Math.abs(pegX(0, currentPegCount || 5)) + 1.4;
+  const cam = keyLight.shadow.camera as OrthographicCamera;
+  const ext = Math.max(halfW, 3.2);
+  cam.left = -ext; cam.right = ext;
+  cam.top = 4.2; cam.bottom = -3.4;
+  cam.near = 4; cam.far = 20;
+  cam.updateProjectionMatrix();
+}
 function buildLights(): void {
   for (const l of lights) scene.remove(l);
   lights.length = 0;
-  keyBase = 2.2 / PI;
+  keyBase = 2.2;
   const key = new DirectionalLight(theme.key, keyBase);
   key.position.set(4, 8, 5);
   key.shadow.bias = -0.0004;
   key.shadow.normalBias = 0.02;
   key.shadow.radius = 3;
-  key.shadow.distance = 20;
   keyLight = key;
-  const hemi = new HemisphereLight(theme.ambient, theme.bg, 0.7 / PI);
-  const rim = new DirectionalLight(theme.ambient, 0.5 / PI);
+  fitShadow();
+  const hemi = new HemisphereLight(theme.ambient, theme.bg, 0.7);
+  const rim = new DirectionalLight(theme.ambient, 0.5);
   rim.position.set(-5, 3, -4);
   lights.push(key, key.target, hemi, rim);
   for (const l of lights) scene.add(l);
@@ -363,7 +374,7 @@ function buildBoard(state: State): void {
   boardGroup = new Group();
   pegMeshes = []; markers = []; loopPool = [];
   const count = state.pegs.length;
-  currentPegCount = count;
+  if (count !== currentPegCount) { currentPegCount = count; fitShadow(); }
   for (let i = 0; i < count; i++) {
     const peg = makePeg(pegX(i, count));
     boardGroup.add(peg);
