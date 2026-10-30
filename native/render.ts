@@ -581,12 +581,12 @@ export function applyLook(next: Look): void {
     denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
   };
   // High threshold: only sparks, glints on brass and the lift ring bloom.
-  // r169 page: UnrealBloomPass 0.32 → 0.32² at minor 29 (r185 bloom).
-  renderer.bloom = next.bloom ? { strength: 0.32 * 0.32, radius: 0.5, threshold: 0.9, resolution: next.budget.bloomRes } : null;
+  // r169 page: the r160 bloom model with the page's own 0.32 (minor 30).
+  renderer.bloom = next.bloom ? { model: "r160", strength: 0.32, radius: 0.5, threshold: 0.9, resolution: next.budget.bloomRes } : null;
   // render.js GradeShader (before OutputPass, so on linear light): a 0.22 S-curve, +10 % saturation, warm
   // highlights / cool shadows, the s * 0.97 + 0.02 lift with over-range light kept, the 0.28 vignette.
   renderer.grade = next.grade ? {
-    space: "linear", contrast: 0.22, saturation: 1.1, levels: [0.97, 0.02], overRange: "keep",
+    space: "linear", contrastCurve: "s", contrast: 0.22, saturation: 1.1, levels: [0.97, 0.02], overRange: "keep",
     shadows: [0.97, 0.98, 1.04], highlights: [1.05, 1.0, 0.94], split: [0.2, 0.8],
     vignette: { amount: 0.28, inner: 0.32, outer: 0.85, scale: [1, 0.9] },
   } : null;
