@@ -27,7 +27,7 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 | `native/main.ts` | Entry module: app state machine, screen routing, round lifecycle (lift, drop, refusals, undo, hint, Learn step gate, Swift Shuttle timer), achievements and local boards, score posting, input (actions, pointer/touch on the 3D pegs), fixed-step clock, lifecycle |
 | `native/screens.ts` | Every screen on `starhermit:ui`: backdrop, title, modes, setup, play (HUD, rails / drawers, peg mirror, tray), pause, settings, results, help, caption line, toast; the responsive layouts |
 | `native/render.ts` | The atelier on `starhermit:scene`: table, mat, spools, strands, pegs, loops, stitch markers, ground rings, sparks, dust, lamp shimmer, tweens, shake, parallax, camera fit, peg picking, per-level look |
-| `native/quality.ts` | The old presets and budgets keyed by the runtime's graphics tier (`frame().quality`) and level index |
+| `native/quality.ts` | The look per graphics level: the level's effects (`levelSettings()`) and the old art presets and budgets keyed by its tier |
 | `native/audio.ts` | Authored clips per event on the runtime's buses, the rendered music pad and room tone, captions |
 | `native/platform.ts` | Save (progress + score boards) with merge and old cloud-save migration, the game's options in engine settings with old settings-KV migration, player, invite link, server clock, leaderboard read and score posting through `score-script.js` |
 | `native/style.ts`, `assets/ui-style.json`, `tools/ui-style.css` | UI theme and classes (`npm run css` converts the CSS); high-contrast tokens |
@@ -314,8 +314,12 @@ loops jump to their exact positions and the game is fully playable.
 units: three r169 intensities as the page set them) with soft shadows over the board (render.js's fitted box, radius 3), a
 hemisphere fill and a cool rim, and the theme colour as background and fog. The look follows the runtime's
 graphics level (Options › Graphics: Auto from the device, or a chosen level; render scale, adaptive
-resolution, the frame-rate limit and readout are the runtime's): `native/quality.ts` maps its four tiers onto
-the browser build's presets.
+resolution, the frame-rate limit and readout are the runtime's). The engine-owned effects are the level's own
+(`levelSettings()`): shadows and their map size, AO (resolution, samples), bloom resolution, the grade and
+anti-aliasing, shown below at each tier's anchor level (quantum, molecular, terrestrial, galactic); Low keeps
+MSAA where the level asks for none (engine 1.36.1 draws fog and translucent overlays off-colour without
+anti-aliasing). `native/quality.ts` maps the four tiers onto the browser build's art presets (the rest of the
+table).
 
 | Tier | Shadows | AO | Bloom | Grade | AA | Reflections | Particles | Ambient motion | Detail | Materials | Yarn texture | Geometry LOD | Dust | Sparks |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -324,7 +328,7 @@ the browser build's presets.
 | high | 2048² | on | on | on | SMAA | on | 900 soft sparks | animated | detailed | Physical (clear-coated brass) | 128 × 32 | 1 | 70 | 1× |
 | ultra | 4096² | high | on | on | MSAA | on | 900 soft sparks | animated | detailed | Physical (clear-coated brass) | 256 × 64 | 1.5 | 120 | 1.5× |
 
-Sparks scale within a tier by the runtime's level index (≤ 2×). Reflections are a PMREM-filtered
+Sparks scale within a tier by the level's particle budget over the anchor's (≤ 2×). Reflections are a PMREM-filtered
 `RoomEnvironment` at `environmentIntensity` 0.38; bloom has threshold 0.9 (sparks, brass glints); the grade is
 the old display-space shader's gentle S-curve, +10 % saturation, warm highlights / cool shadows and a 0.28
 vignette. Detailed surfaces have the yarn-twist texture as colour and bump on the loops (the old sheen is not

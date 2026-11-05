@@ -15,9 +15,10 @@
 // are rendered into clips once (createClip): a live synthesis graph makes
 // clip loads fail on the engine's web runtime. The synthesized stand-ins the
 // browser build played while a clip decoded are not ported, so a clip still
-// loading is silent (its caption still shows). Clips load once the mixer
-// runs (natively at once, in a browser after the first press), one at a
-// time; rendered clips one a frame.
+// loading is silent (its caption still shows). Every clip loads at once in
+// onStart (the engine hands each loaded clip to the mixer, natively and in a
+// browser); the rendered clips, one a frame, and the pad and room tone wait
+// for the mixer to run (in a browser, the first press).
 import { context, createClip, loadClip, play as playClip, type AudioClip, type Bus, type Sound } from "starhermit:audio";
 import { Rules } from "./game.ts";
 
@@ -39,9 +40,6 @@ const CAPTIONS: Record<string, string> = {
 };
 
 const clips = new Map<string, AudioClip>();
-const queue: string[] = [];
-let loading = false;
-let wantClips = false;
 let suspended = false;
 let avRng = Rules.mulberry32(1234);
 let captionFn: ((text: string) => void) | null = null;
@@ -51,15 +49,12 @@ export function onCaption(fn: (text: string) => void): void { captionFn = fn; }
 /** audio.js setSeed: the audiovisual variant stream for a round. */
 export function setSeed(seed: number): void { avRng = Rules.mulberry32((seed ^ 0xa53f9c11) >>> 0); }
 
-function load(name: string): void { if (!queue.includes(name) && !clips.has(name)) queue.push(name); }
-function pump(): void {
-  if (loading || !queue.length) return;
-  const name = queue.shift()!;
-  loading = true;
-  loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); loading = false; }, (e: unknown) => { console.warn(`sfx ${name}: ${String(e)}`); loading = false; });
+/** Loads every clip at once (onStart); a cue whose clip is still loading is silent. */
+export function loadSfx(): void {
+  for (const name of new Set(Object.values(SFX).flat())) {
+    loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); }, (e: unknown) => console.warn(`sfx ${name}: ${String(e)}`));
+  }
 }
-/** Asks for the clips; they load once the mixer runs (see update). */
-export function loadSfx(): void { wantClips = true; }
 
 /** A game event's sample (once loaded) and its caption. */
 export function play(event: string): void {
@@ -73,7 +68,7 @@ export function play(event: string): void {
   const bus: Bus = VOICE.has(event) || INTERFACE.has(event) ? "interface" : "effects";
   const gain = VOICE.has(event) ? LEVEL.voice : LEVEL.effects;
   try { playClip(clip, { bus, gain }); }
-  catch { clips.delete(file); load(file); } // a clip the mixer lost: load it again
+  catch { /* the mixer is full this frame: skip it */ }
 }
 
 // -- rendered clips -------------------------------------------------------------------
@@ -124,17 +119,10 @@ export function startRound(getProgress: () => number): void { progress = getProg
 /** A hidden window: the pad and the room tone hold (audio.js suspended its context). */
 export function setSuspended(on: boolean): void { suspended = on; }
 
-/** Each frame: the clips once the mixer runs (one at a time), the rendered notes and room tone one a
- * frame after them, then the room tone by state and the pad's next step by mixer time. */
+/** Each frame once the mixer runs: the rendered notes and room tone one a frame, then the room tone by
+ * state and the pad's next step by mixer time. */
 export function update(): void {
   if (context.state !== "running") return;
-  if (wantClips) {
-    wantClips = false;
-    for (const names of Object.values(SFX)) for (const n of names) load(n);
-    return;
-  }
-  pump();
-  if (loading || queue.length) return;
   if (!roomTone) { roomTone = roomToneClip(); return; }
   for (const f of SCALE) if (!notes.has(f)) { notes.set(f, noteClip(f)); return; }
   try {

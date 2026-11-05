@@ -16,7 +16,8 @@
 // environmentIntensity 0.38 (r169 let scene.environment override the
 // materials' envMapIntensity, so materials keep 1); the post chain (GTAO,
 // UnrealBloom threshold 0.9, the GradeShader on the linear buffer before OutputPass, FXAA / SMAA /
-// MSAA) is renderer.ao / bloom / grade / antialias; the fitted orthographic
+// MSAA) is renderer.ao / bloom / grade / antialias, each on and sized by the
+// graphics level; the fitted orthographic
 // shadow box is render.js's; MeshPhysicalMaterial's sheen
 // on the yarn is not drawn by the engine (the yarn keeps its twist texture
 // and bump). Peg picking intersects the camera ray with each peg's pick
@@ -559,6 +560,7 @@ const shadowsOn = (): boolean => !!look && look.shadows > 0;
 function applyShadows(): void {
   const on = shadowsOn();
   renderer.shadowMap.enabled = on;
+  // The level's map size: at engine.minor ≥ 23 the engine keeps whatever the game sets.
   if (keyLight) { keyLight.castShadow = on; if (on) keyLight.shadow.mapSize = look!.shadows; }
   scene.traverse((o) => { if (o.userData.cast) (o as Mesh).castShadow = on; });
 }
@@ -576,13 +578,15 @@ export function applyLook(next: Look): void {
   if (look && JSON.stringify(look) === JSON.stringify(next)) return;
   const before = look;
   look = next;
-  renderer.ao = next.ao === "off" ? null : {
-    blendIntensity: 0.75, radius: 0.5, distanceExponent: 1.4, thickness: 1.0, scale: 1.0, samples: next.ao === "high" ? 16 : 8, resolution: next.budget.aoRes,
-    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
+  // The level's AO; full resolution is the engine's "high" (the old Ultra's wider denoise).
+  const ao = next.ao, full = !!ao && ao.resolution >= 1;
+  renderer.ao = ao && {
+    blendIntensity: 0.75, radius: 0.5, distanceExponent: 1.4, thickness: 1.0, scale: 1.0, samples: ao.samples, resolution: ao.resolution,
+    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: full ? 6 : 4, rings: 2, samples: ao.denoiseSamples, radiusExponent: 2 },
   };
   // High threshold: only sparks, glints on brass and the lift ring bloom.
   // r169 page: the r160 bloom model with the page's own 0.32 (minor 30).
-  renderer.bloom = next.bloom ? { model: "r160", strength: 0.32, radius: 0.5, threshold: 0.9, resolution: next.budget.bloomRes } : null;
+  renderer.bloom = next.bloom === null ? null : { model: "r160", strength: 0.32, radius: 0.5, threshold: 0.9, resolution: next.bloom };
   // render.js GradeShader (before OutputPass, so on linear light): a 0.22 S-curve, +10 % saturation, warm
   // highlights / cool shadows, the s * 0.97 + 0.02 lift with over-range light kept, the 0.28 vignette.
   renderer.grade = next.grade ? {

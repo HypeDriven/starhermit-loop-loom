@@ -1,0 +1,38 @@
+# Graphics-tier bench (tools/engine-tier-bench.mjs): Journey stage 1 (fixed loom), its four
+# moves by keys and peg clicks (lifted loops, peg-complete sparks, dust, the finished loom)
+# inside the measured stretch.
+# viewport 1280x720
+until 300 =Play
+frames 20
+click =Play
+until 120 Start round
+frames 10
+expect Stage 1
+click =Start round
+until 120 Uniform pegs
+frames 120
+measure start
+key Enter 1
+frames 20
+key ArrowLeft 1
+key ArrowLeft 1
+key Enter 1
+frames 20
+click Peg 2:
+frames 10
+click Peg 1:
+frames 20
+key ArrowRight 1
+key Enter 1
+frames 20
+key ArrowRight 1
+key ArrowRight 1
+key Enter 1
+frames 20
+click Peg 3:
+frames 10
+click Peg 2:
+frames 20
+until 300 Loom complete!
+frames 300
+measure stop
