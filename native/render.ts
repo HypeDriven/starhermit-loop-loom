@@ -30,6 +30,7 @@ import {
   PointsMaterial, Raycaster, RepeatWrapping, RingGeometry, RoomEnvironment, SphereGeometry, SRGBColorSpace, TextureLoader,
   TorusGeometry, TubeGeometry, Vector2, Vector3, mergeGeometries, renderer, scene,
   type Material, type Object3D, type Texture,
+  stopTweens, tween,
 } from "starhermit:scene";
 import { OffscreenCanvas } from "starhermit:canvas";
 import { frame } from "starhermit:engine";
@@ -437,6 +438,7 @@ function spawnParticles(x: number, y: number, z: number, n: number, spread: numb
   }
 }
 function stepParticles(dt: number): void {
+  if (!alive.length && !sparks.visible) return;
   let w = 0;
   for (let i = 0; i < alive.length; i++) {
     const p = alive[i]!;
@@ -496,23 +498,7 @@ function stepAmbient(dt: number): void {
 }
 
 // -- state → view ----------------------------------------------------------------------------------
-interface Tween { vec: Vector3; from: Vector3; to: Vector3; t: number; dur: number }
-const tweens: Tween[] = [];
-function addTween(vec: Vector3, to: Vector3, dur: number): void {
-  const i = tweens.findIndex((t) => t.vec === vec);
-  if (i >= 0) tweens.splice(i, 1);
-  tweens.push({ vec, from: vec.clone(), to, t: 0, dur });
-}
-function stepTweens(dt: number): void {
-  for (let i = tweens.length - 1; i >= 0; i--) {
-    const t = tweens[i]!;
-    t.t += dt;
-    const k = Math.min(1, t.t / t.dur);
-    const e = 1 - Math.pow(1 - k, 3); // ease-out cubic
-    t.vec.copy(t.from).lerp(t.to, e);
-    if (k >= 1) tweens.splice(i, 1);
-  }
-}
+function stopLoopTweens(): void { for (const rec of loopPool) stopTweens(rec.slot.position); }
 let shakeAmp = 0;
 function syncLoops(state: State, animate: boolean): void {
   currentState = state;
@@ -530,8 +516,8 @@ function syncLoops(state: State, animate: boolean): void {
     }
     const lifted = !!selection && selection.peg === rec.peg && rec.level >= pegArr.length - selection.size;
     const to = new Vector3(pegX(rec.peg, count), 0.28 + rec.level * LOOP_SPACING + (lifted ? 1.1 : 0), 0);
-    if (animate && !reducedMotion) addTween(rec.slot.position, to, 0.28);
-    else rec.slot.position.copy(to);
+    if (animate && !reducedMotion) tween(rec.slot.position, { x: to.x, y: to.y, z: to.z }, { duration: 0.28, easing: "easeOutCubic" });
+    else { stopTweens(rec.slot.position); rec.slot.position.copy(to); }
   }
   // Peg completion: the cue, a burst in the peg's colour and a small shake.
   const uniformNow = new Set<number>();
@@ -634,7 +620,7 @@ export function setBoard(state: State): void {
 /** A new round: the board without the completion cues for pegs that start uniform. */
 export function resetBoard(state: State): void {
   lastUniform = new Set(state.pegs.flatMap((p, i) => (p.length >= 2 && p.every((c) => c === p[0]) ? [i] : [])));
-  tweens.length = 0;
+  stopLoopTweens();
   selection = null;
   if (selectRing) selectRing.visible = false;
   currentState = state;
@@ -658,7 +644,7 @@ export function previewTargets(state: State, fromPeg: number | null): void {
 export function clearPreview(): void { for (const m of markers) { m.active = false; m.mesh.visible = false; m.mat.opacity = 0; } }
 /** Skip/fast-forward: every loop at its exact end position. */
 export function settle(): void {
-  tweens.length = 0;
+  stopLoopTweens();
   if (currentState && look) syncLoops(currentState, false);
 }
 let invalidPeg = -1;
@@ -735,7 +721,6 @@ export function update(dtIn: number): void {
     if (aspect !== camera.aspect) { camera.aspect = aspect; camera.updateProjectionMatrix(); }
   }
   fitCamera();
-  stepTweens(dt);
   stepParticles(dt);
   stepAmbient(dt);
   for (const m of markers) if (m.active) m.mat.opacity = 0.35 + Math.sin(f.time * 4) * 0.15;

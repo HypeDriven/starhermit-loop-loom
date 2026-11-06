@@ -56,7 +56,6 @@ export const app = {
   drawerRight: false,
   results: null as null | { unlocked: string[]; reason: string },
   lb: null as null | "posting" | { posted: boolean; rank: number | null },
-  toast: null as null | { text: string; until: number },
   caption: null as null | { text: string; until: number },
   hintUntil: 0,
   warnedLowTime: false,
@@ -95,8 +94,12 @@ export function recordTitle(record: RecordT | null): string {
   return T(record.title || record.id);
 }
 export function announce(text: string): void { if (text) ui.announce(text.slice(0, 600)); }
-/** main.js toast(): 2.6 s at the top. */
-export function toast(text: string): void { app.toast = { text, until: now() + 2.6 }; }
+let shownToast: ui.Toast | null = null;
+/** main.js toast(): 2.6 s at the top, below the HUD, one at a time; callers announce what needs it. */
+export function toast(text: string): void {
+  shownToast?.dismiss();
+  shownToast = ui.toast!(text, { duration: 2.6, style: ["toast", "toast-text"], dismissible: false, announce: false, position: "top", offset: 54 });
+}
 function haptic(pattern: number | number[]): void {
   if (!options.haptics) return;
   try { vibrate(Array.isArray(pattern) ? pattern.reduce((a, b) => a + b, 0) : pattern); } catch { /* unsupported */ }
@@ -185,7 +188,6 @@ export function startRound(record: RecordT, mode: Mode): void {
   app.hintUntil = 0;
   app.warnedLowTime = false;
   cmdCounter = 0;
-  audio.setSeed(record.seed);
   audio.startRound(progressFraction);
   render.setTheme(record.theme);
   render.resetBoard(app.current.state);
@@ -202,7 +204,6 @@ function resumeRound(): void {
   const c = app.current!;
   app.pendingMode = c.mode as Mode;
   app.selectedPeg = null;
-  audio.setSeed(c.record.seed);
   audio.startRound(progressFraction);
   render.setTheme(c.record.theme);
   render.resetBoard(c.state);
@@ -275,9 +276,8 @@ function postToLeaderboard(total: number): void {
 export function leaderboardLine(): string | null {
   const lb = app.lb;
   if (!lb) return null;
-  const a = account();
-  if (lb === "posting") return a.lbPosting;
-  return !lb.posted ? a.lbNotPosted : lb.rank ? a.lbRank.replace("{rank}", String(lb.rank)) : a.lbPosted;
+  if (lb === "posting") return account("leaderboardPosting");
+  return !lb.posted ? account("leaderboardNotPosted") : lb.rank ? account("leaderboardRank", { rank: lb.rank }) : account("leaderboardPosted");
 }
 
 function showTutorialStep(): void {
@@ -440,7 +440,7 @@ export function copyInvite(): void {
   if (!link) return;
   let ok = false;
   try { clipboard.writeText(link); ok = true; } catch { ok = false; }
-  toast(ok ? account().copied : account().copyFailed);
+  toast(account(ok ? "inviteCopied" : "inviteFailed"));
 }
 export function signIn(): void { void requestSignIn().catch(() => undefined); }
 
@@ -563,7 +563,7 @@ function emptyState(rec: RecordT): Session["state"] {
 platform.onOptionsChange(() => render.setPalette(options.palette));
 platform.onProgressMerged(() => { progress = Sess.loadProgress(); });
 onPreferencesChange((p) => render.setReducedMotion(p.reducedMotion));
-onSessionEnded(() => toast(account().signedOut));
+onSessionEnded(() => toast(account("signedOut")));
 // A hidden window pauses an active round and saves it; coming back says so (main.js bindLifecycle).
 onSuspend(() => {
   hidden = true;
@@ -614,7 +614,6 @@ onUpdate((dt) => {
     app.hintUntil = 0;
     if (app.selectedPeg === null) { render.setSelection(null); render.clearPreview(); }
   }
-  if (app.toast && app.toast.until < now()) app.toast = null;
   if (app.caption && app.caption.until < now()) app.caption = null;
 });
 onRender(() => {

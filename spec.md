@@ -36,7 +36,7 @@ matching colour or an empty peg, and keep going until every brass peg holds one 
 | `src/content.js` | Themes, palettes, glyphs, Journey (48 stages, each built on first use), Learn lessons, Daily, Practice, Challenges, Score Chase, content validation |
 | `src/session.js` | Round lifecycle, command log, undo stack, replay envelope, snapshot, local boards, cloud-document merge, achievements; an injectable round clock (`setClock`) |
 | `src/save.js` | Pure save helpers: the game options and their validation, the old KV keys, save data, the old cloud document reader |
-| `src/i18n.js`, `src/locales/`, `src/sh-strings.js` | Localization core (`T`, `N`, `setLocale`, `pickLocale`) and catalogues keyed by the US-English text; account strings |
+| `assets/strings.json` | The nine locales' string tables keyed by the US-English text (engine `strings`) |
 | `score-script.js` | StarHermit platform script (`server=score-script.js`): range-checks a finished round's total and posts it to the `high-score` leaderboard (canonical copy in the games repo's `tools/score-script.js`) |
 | `server.js` | Local-dev backend: static host + API (time, daily, replay-validated scores, achievements, presence); the client never calls these routes |
 | `tests/*.test.js` | `node --test`: rules, content, session, save, i18n |
@@ -316,14 +316,12 @@ hemisphere fill and a cool rim, and the theme colour as background and fog. The 
 graphics level (Options › Graphics: Auto from the device, or a chosen level; render scale, adaptive
 resolution, the frame-rate limit and readout are the runtime's). The engine-owned effects are the level's own
 (`levelSettings()`): shadows and their map size, AO (resolution, samples), bloom resolution, the grade and
-anti-aliasing, shown below at each tier's anchor level (quantum, molecular, terrestrial, galactic); Low keeps
-MSAA where the level asks for none (engine 1.38.0 draws fog and translucent overlays off-colour without
-anti-aliasing). `native/quality.ts` maps the four tiers onto the browser build's art presets (the rest of the
+anti-aliasing, shown below at each tier's anchor level (quantum, molecular, terrestrial, galactic). `native/quality.ts` maps the four tiers onto the browser build's art presets (the rest of the
 table).
 
 | Tier | Shadows | AO | Bloom | Grade | AA | Reflections | Particles | Ambient motion | Detail | Materials | Yarn texture | Geometry LOD | Dust | Sparks |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| low | off | off | off | off | MSAA | off | 150 flat flecks | still | plain | Lambert, loop + stitch merged into one vertex-coloured mesh | — | ½ | — | 0.5× |
+| low | off | off | off | off | off | off | 150 flat flecks | still | plain | Lambert, loop + stitch merged into one vertex-coloured mesh | — | ½ | — | 0.5× |
 | balanced | 1024² | off | on | on | FXAA | on | 900 soft sparks | animated | detailed | Standard | 128 × 32 | ¾ | 50 | 0.75× |
 | high | 2048² | on | on | on | SMAA | on | 900 soft sparks | animated | detailed | Physical (clear-coated brass) | 128 × 32 | 1 | 70 | 1× |
 | ultra | 4096² | high | on | on | MSAA | on | 900 soft sparks | animated | detailed | Physical (clear-coated brass) | 256 × 64 | 1.5 | 120 | 1.5× |
@@ -391,10 +389,9 @@ The nine locales are **en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, 
 runtime's interface language (`preferences().language`: the player's choice in Options › Language, else the
 account's preferred language or the device's), mapped to the nearest locale (`pickLocale`); a change shows
 on the next frame without touching the round. Every string is drawn through `T()` each frame from
-`src/locales/` (keyed by the US-English text; en-GB lists the *colour* spellings, es-ES and fr-CA their
-differences). Content copy — colour names, lessons and their prompts, challenges, the Daily Loom / Score Chase
-titles, achievements and captions — is English data translated at display time. Account strings come from
-`src/sh-strings.js`.
+`assets/strings.json` (keyed by the US-English text). Content copy — colour names, lessons and their prompts, challenges, the Daily Loom / Score Chase
+titles, achievements and captions — is English data translated at display time. Account strings are the engine's
+`starhermit.*`.
 
 ---
 

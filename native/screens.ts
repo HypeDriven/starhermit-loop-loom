@@ -6,7 +6,7 @@
 // and pause buttons; the left rail: objective, par and seed, Undo, Hint,
 // Restart, Skip anim, progression; the right rail: mode, connection, top
 // scores, achievements; the accessible peg mirror; the thumb-zone tray:
-// Undo, Hint, Help, Panel, View), the caption line and the toast. The
+// Undo, Hint, Help, Panel, View), and the caption line. The
 // browser's media queries are layouts picked by the window's logical size:
 // desktop (≥ 1024 px: rails at the sides), tablet (rails as drawers), portrait
 // phone (≤ 700 px wide: smaller HUD cards, one tray row, 44 × 52 px pegs) and
@@ -31,10 +31,8 @@ import {
 // ------------------------------------------------------------------ layout
 interface Layout { lw: number; lh: number; sc: number; desktop: boolean; portrait: boolean; landscape: boolean }
 function layoutNow(): Layout {
-  const f = frame();
-  const sc = ui.preferences().scale;
-  const sa = f.safeArea;
-  const lw = Math.max(1, (f.width - sa.left - sa.right) / sc), lh = Math.max(1, (f.height - sa.top - sa.bottom) / sc);
+  const v = ui.viewport!();
+  const lw = Math.max(1, v.width), lh = Math.max(1, v.height), sc = v.scale;
   const landscape = lh <= 500 && lw > lh;
   const portrait = !landscape && lw <= 700 && lh >= lw;
   return { lw, lh, sc, desktop: lw >= 1024 && !landscape, portrait, landscape };
@@ -107,7 +105,6 @@ export function drawScreens(): void {
     case "play": playScreen(L); break;
   }
   caption(L);
-  toast(L);
   if (app.focusNext) {
     const age = f.frame - app.openedFrame;
     if (age >= 1) ui.setFocus(app.focusNext);
@@ -155,7 +152,6 @@ function titleScreen(w: number): void {
   heading("h1", "Loop Loom", w, "title-h");
   para(T("A textile atelier of colored loops and brass pegs."), w, "p", "tagline-1", true);
   para(T("Move loops between pegs — keeping their stack order — until every peg is one color."), w, "p", "tagline-2", true);
-  const a = account();
   const list: Btn[] = [{ id: "btn-play", text: T("Play"), style: "btn", act: play }];
   if (hasSnapshot()) list.push({ id: "btn-resume-saved", text: T("Resume saved round"), act: resumeSaved });
   list.push(
@@ -163,8 +159,8 @@ function titleScreen(w: number): void {
     { id: "btn-help-title", text: T("How to play"), act: () => openHelp("title") },
     { id: "btn-title-settings", text: T("Settings"), act: () => openSettings("title") },
   );
-  if (!platform.signedIn()) list.push({ id: "btn-signin", text: a.signIn, act: signIn });
-  if (platform.inviteLink()) list.push({ id: "btn-invite", text: a.invite, act: copyInvite });
+  if (!platform.signedIn()) list.push({ id: "btn-signin", text: account("signIn"), act: signIn });
+  if (platform.inviteLink()) list.push({ id: "btn-invite", text: account("invite"), act: copyInvite });
   col("title-nav", w, list);
   const done = Object.keys(progress.journeyDone).length;
   const who = platform.signedIn() ? (platform.displayName() || "…") + " · " : "";
@@ -551,15 +547,10 @@ function tray(L: Layout): void {
   ui.place("action-tray", at, () => flow("tray", list, w, 8, L.landscape ? "start" : "center"));
 }
 
-// ------------------------------------------------------------------ caption and toast
+// ------------------------------------------------------------------ caption
 function caption(L: Layout): void {
   const cap = app.caption;
   if (!cap) return;
   const y = app.screen === "play" ? (L.landscape ? 108 : bottomBand(L) + 8) : 24;
   ui.place("caption-line", { anchor: "bottom", y }, () => ui.column("caption-col", () => para(T(cap.text), L.lw - 60, "caption-text", "caption-text", true), { style: "caption", align: "center" }));
-}
-function toast(L: Layout): void {
-  const t = app.toast;
-  if (!t) return;
-  ui.place("toast", { anchor: "top", y: 70 }, () => ui.column("toast-col", () => para(t.text, Math.min(L.lw - 60, 480), "toast-text", "toast-text", true), { style: "toast", align: "center" }));
 }
