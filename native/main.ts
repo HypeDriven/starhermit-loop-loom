@@ -1,3 +1,4 @@
+import { withLanguageRender as __l10nRender } from "./l10n/menu.ts";
 // Loop Loom on the StarHermit engine: the entry module (starhermit.txt
 // engine.entry), played natively by the StarHermit client and in browsers by
 // the engine's web runtime. The rules (src/rules.js), the content
@@ -616,8 +617,12 @@ onUpdate((dt) => {
   }
   if (app.caption && app.caption.until < now()) app.caption = null;
 });
-onRender(() => {
+onRender(__l10nRender(() => {
   drawScreens();
   pegInput();
   render.update(frameDt);
-});
+}));
+
+// localization-runtime:menu
+import { installLanguageMenu as __installLanguageMenu } from "./l10n/menu.ts";
+__installLanguageMenu(false);

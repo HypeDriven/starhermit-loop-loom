@@ -1,3 +1,7 @@
+import { localizedStyle as __l10nStyle } from "./l10n/font.ts";
+import { localizedDrawOptions as __l10nDrawOptions } from "./l10n/font.ts";
+// localization-runtime:attached
+import { openLocalizedOptions as __l10nOptions } from "./l10n/menu.ts";
 // The browser build's DOM shell (index.html + main.js) as starhermit:ui,
 // built every frame over the 3D atelier: the menu backdrop, the centred
 // overlay panels (title, modes, setup with the Journey grid / Practice
@@ -12,7 +16,21 @@
 // phone (≤ 700 px wide: smaller HUD cards, one tray row, 44 × 52 px pegs) and
 // landscape phone (≤ 500 px tall: the tray bottom-left, the mirror
 // bottom-right, 200 px drawers).
-import { frame, openMenu } from "starhermit:engine";
+// The browser build's DOM shell (index.html + main.js) as starhermit:ui,
+// built every frame over the 3D atelier: the menu backdrop, the centred
+// overlay panels (title, modes, setup with the Journey grid / Practice
+// difficulty / Challenge list, pause, settings, results, help), the play
+// screen (the HUD strip: objective card, moves and score card, the ☰ panel
+// and pause buttons; the left rail: objective, par and seed, Undo, Hint,
+// Restart, Skip anim, progression; the right rail: mode, connection, top
+// scores, achievements; the accessible peg mirror; the thumb-zone tray:
+// Undo, Hint, Help, Panel, View), and the caption line. The
+// browser's media queries are layouts picked by the window's logical size:
+// desktop (≥ 1024 px: rails at the sides), tablet (rails as drawers), portrait
+// phone (≤ 700 px wide: smaller HUD cards, one tray row, 44 × 52 px pegs) and
+// landscape phone (≤ 500 px tall: the tray bottom-left, the mirror
+// bottom-right, 200 px drawers).
+import { frame } from "starhermit:engine";
 import { requestRebind } from "starhermit:input";
 import * as draw from "starhermit:draw";
 import * as ui from "starhermit:ui";
@@ -54,9 +72,9 @@ function button(b: Btn, width: number | null = null): boolean {
   const s: ui.Style = width != null ? { width } : {};
   if (width != null && buttonWidth(b.text, style) > width) {
     const inner = Math.max(20, width - 40);
-    opts.content = () => { ui.style({ text: { align: "center" } }).paragraph(b.text, inner); };
+    opts.content = () => { ui.style(__l10nStyle({ text: { align: "center" } })).paragraph(b.text, inner); };
   }
-  const hit = ui.style(style, s).id(b.id).button(b.text, opts);
+  const hit = ui.style(__l10nStyle(style), __l10nStyle(s)).id(b.id).button(b.text, opts);
   if (hit && frame().frame !== app.openedFrame) {
     if (b.sound !== null) (b.sound === "back" ? back : click)();
     b.act();
@@ -74,7 +92,7 @@ function para(text: string, width: number, cls = "p", id?: string, center = fals
   if (!text) return;
   const styles: (string | ui.Style)[] = [cls];
   if (center) styles.push({ text: { align: "center" } });
-  let u = ui.style(...styles);
+  let u = ui.style(...__l10nStyle(styles));
   if (id) u = u.id(id);
   if (textWidth(text, styles) <= width) u.label(text);
   else u.paragraph(text, width);
@@ -83,7 +101,7 @@ function heading(cls: string, text: string, width: number, id?: string, center =
   const styles: (string | ui.Style)[] = [cls];
   if (center) styles.push({ text: { align: "center" } });
   if (textWidth(text, styles, "heading") <= width) (id ? ui.id(id) : ui).style(...styles).heading(text);
-  else ui.style(...styles).paragraph(text, width);
+  else ui.style(...__l10nStyle(styles)).paragraph(text, width);
 }
 
 // ------------------------------------------------------------------ the frame
@@ -222,9 +240,9 @@ function journeyGrid(w: number, L: Layout): void {
         const done = !!progress.journeyDone[`journey-${i + 1}`];
         const locked = i > progress.journeyUnlocked;
         const aria = T(done ? "Stage {n} completed" : locked ? "Stage {n} locked" : "Stage {n}", { n: i + 1 });
-        const opts: ui.ButtonOptions = { content: () => { ui.style({ text: { align: "center", color: "#ffffff" } }).label(String(i + 1)); } };
+        const opts: ui.ButtonOptions = { content: () => { ui.style(__l10nStyle({ text: { align: "center", color: "#ffffff" } })).label(String(i + 1)); } };
         if (locked) opts.disabled = true;
-        if (ui.style(done ? "stage-done" : "stage", { width: cw }).id(`stage-${i + 1}`).button(aria, opts) && !locked && !fresh(0)) { click(); playJourney(i); }
+        if (ui.style(__l10nStyle(done ? "stage-done" : "stage"), __l10nStyle({ width: cw })).id(`stage-${i + 1}`).button(aria, opts) && !locked && !fresh(0)) { click(); playJourney(i); }
       }
     }, { columns: cols, gap, width: gw });
     lastSize.set("stage-grid", r.height / L.sc);
@@ -255,7 +273,7 @@ function settingsScreen(w: number): void {
   heading("h1", T("Settings"), w, "settings-h");
   para(T("Sound, graphics, language, reduced motion, high contrast and larger text are in the StarHermit Options."), w, "meta", "options-note", true);
   flow("options-row", [
-    { id: "btn-options", text: T("Audio & graphics"), act: () => openMenu() },
+    { id: "btn-options", text: T("Audio & graphics"), act: () => __l10nOptions() },
     { id: "btn-rebind", text: T("Keyboard bindings"), act: () => requestRebind() },
   ], w);
   heading("h2", T("Accessibility"), w, "access-h");
@@ -323,7 +341,7 @@ function resultsScreen(w: number): void {
   ui.column("result-score", () => rows.forEach(([k, v], i) => ui.row(`score-${i}`, () => {
     para(k, w - 90, "score-k");
     ui.spacer();
-    ui.style("score-v").id(`score-${i}-v`).label(v);
+    ui.style(__l10nStyle("score-v")).id(`score-${i}-v`).label(v);
   }, { width: w, align: "center", style: "score-row" })), { spacing: 2, width: w });
   if (res.unlocked.length) {
     ui.column("result-achievements", () => {
@@ -498,10 +516,10 @@ function mirror(L: Layout): void {
           const stack = p.slice().reverse();
           const lineH = 18 * k;
           const top = rect.y + 6 * k;
-          if (!stack.length) draw.text("·", rect.x + rect.width / 2, top, { size: fs, align: "center", color: st.colors.text });
-          stack.forEach((col, j) => draw.text(Content.COLOR_GLYPHS[col] ?? "?", rect.x + rect.width / 2, top + j * lineH, {
+          if (!stack.length) draw.text("·", rect.x + rect.width / 2, top, __l10nDrawOptions({ size: fs, align: "center", color: st.colors.text }));
+          stack.forEach((col, j) => draw.text(Content.COLOR_GLYPHS[col] ?? "?", rect.x + rect.width / 2, top + j * lineH, __l10nDrawOptions({
             size: fs, align: "center", color: st.highContrast ? st.colors.text : palette[col]!,
-          }));
+          })));
           if (app.kbFocusPeg === i && !st.focused) draw.strokeRoundRect(rect.x - 3 * k, rect.y - 3 * k, rect.width + 6 * k, rect.height + 6 * k, 10 * k, "#e8c07a", 3 * k);
         },
       });
