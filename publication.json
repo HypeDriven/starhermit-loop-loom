@@ -1,0 +1,103 @@
+{
+  "game": {
+    "id": "20b67a16-7985-41d9-a723-f3f01593b6e8",
+    "displayName": "Loop Loom",
+    "hosting": {
+      "hostingEnabled": true,
+      "hostedUrl": "https://20b67a16-7985-41d9-a723-f3f01593b6e8.starhermit.com/index.html",
+      "deployStatus": "live",
+      "pinnedCommitSha": null,
+      "deployedCommitSha": null,
+      "deployError": null,
+      "deployedAt": "2026-11-12T08:15:33.770722+00:00",
+      "externalLaunchUrl": null,
+      "engineVersion": "1.38.0",
+      "deployWarning": null
+    }
+  },
+  "publishedAt": "2026-11-12T08:15:38.478Z",
+  "sourceCommit": "126f233a8e8422a9bbea19d0ddd1fbec0507b155",
+  "bytesReceived": 1528788,
+  "archiveSha256": "2c4faadfd243232b572aa3b7726fe039660fb7a03bd1eede554bbad9e8592661",
+  "indexSha256": "a381ee9a0c38d82a775730ed2f9f6fad31ea5eb34fad8acac565d65f13b78273",
+  "result": {
+    "clientPublished": true,
+    "serverImageLoaded": false,
+    "imageDigest": null,
+    "bytesReceived": 1528788,
+    "mode": "replace",
+    "filesRemoved": 0,
+    "engineVersion": "1.38.0",
+    "deployWarning": null
+  },
+  "liveVerification": {
+    "at": "2026-11-12T08:15:38.478Z",
+    "files": [
+      {
+        "file": "starhermit-files.json",
+        "sha256": "a381ee9a0c38d82a775730ed2f9f6fad31ea5eb34fad8acac565d65f13b78273",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Hebrew.ttf",
+        "sha256": "8fe2814e7f3cb7959be5d7261106f21daafb0d56652059371d9ae3f0b2cc7877",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Japanese.otf",
+        "sha256": "35d354066bfb82113a83f09af10ed9bb49aeb57f17e81d05109a9582aee08c61",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Khmer.ttf",
+        "sha256": "61b87ace0424185d8f14c51fadf2e2362aa68219fa9ad53b99dd529e46cbb3be",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/SimplifiedChinese.otf",
+        "sha256": "01de421df6f5611a426cf7ec4ba953b2a217d67e6d0c3b5c05045bf016719284",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/Tamil.ttf",
+        "sha256": "a5d6592911693dd6e1038374a4c6ac46d11d156ea6f07bdf12f278d2a472aa0c",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/TraditionalChinese.otf",
+        "sha256": "9f35ff2e116156ae2bbd88c4a509b082b7b9634d5fb453bea087231e4bdc6fd2",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/common.json",
+        "sha256": "8ed9cef52b40ba8d9701099c97057879821aa20aa66717bb2972f27a788ca265",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/fonts.json",
+        "sha256": "37beaea0dba54c9f2c45995cbf9fd19fad21719d701718c41d7e58dd7748ca13",
+        "status": 200
+      },
+      {
+        "file": "assets/localization/locales.json",
+        "sha256": "52ae79df9ddd711ea212ae4a5b9739aba2441f567f1f1a34855486d32dea827f",
+        "status": 200
+      },
+      {
+        "file": "assets/strings.json",
+        "sha256": "6d4cb16073ebd90d943ea1e60c9b0522fa258c82eb6d3b98e23058dbea004235",
+        "status": 200
+      },
+      {
+        "file": "index.html",
+        "sha256": "371da8467357e17f50c6ce5846b59748bb1e60d2f8075738417c30dec1728c89",
+        "status": 200
+      },
+      {
+        "file": "starhermit.txt",
+        "sha256": "88278093ddbe022fcd541d3ee67c61119932e8f26c5ed5c0107dfa49718276b8",
+        "status": 200
+      }
+    ]
+  }
+}
