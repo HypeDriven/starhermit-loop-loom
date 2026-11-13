@@ -20,7 +20,7 @@ import { withLanguageRender as __l10nRender } from "./l10n/menu.ts";
 // the Swift Shuttle timer and play scripts replay exactly.
 import "./i18n.ts";
 import {
-  clipboard, frame, levelSettings, onFixedUpdate, onPreferencesChange, onQuit, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate,
+  afterRender, clipboard, frame, levelSettings, onFixedUpdate, onPreferencesChange, onQuit, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate,
 } from "starhermit:engine";
 import { bindings, onAction, onPointerButton, onPointerMove, onTouch, vibrate } from "starhermit:input";
 import * as ui from "starhermit:ui";
@@ -94,7 +94,20 @@ export function recordTitle(record: RecordT | null): string {
   if (ch) return T(ch.title);
   return T(record.title || record.id);
 }
-export function announce(text: string): void { if (text) ui.announce(text.slice(0, 600)); }
+let pendingAnnouncement: { text: string } | null = null;
+export function announce(text: string): void {
+  if (!text) return;
+  if (pendingAnnouncement) {
+    pendingAnnouncement.text = text.slice(0, 600);
+    return;
+  }
+  pendingAnnouncement = { text: text.slice(0, 600) };
+  afterRender(() => {
+    const pending = pendingAnnouncement;
+    pendingAnnouncement = null;
+    if (pending) ui.announce(pending.text);
+  });
+}
 let shownToast: ui.Toast | null = null;
 /** main.js toast(): 2.6 s at the top, below the HUD, one at a time; callers announce what needs it. */
 export function toast(text: string): void {
