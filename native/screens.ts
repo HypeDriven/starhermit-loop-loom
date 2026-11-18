@@ -1,3 +1,4 @@
+import { bindings } from "starhermit:input";
 import { localizedStyle as __l10nStyle } from "./l10n/font.ts";
 import { localizedDrawOptions as __l10nDrawOptions } from "./l10n/font.ts";
 // localization-runtime:attached
@@ -105,7 +106,7 @@ function heading(cls: string, text: string, width: number, id?: string, center =
 }
 
 // ------------------------------------------------------------------ the frame
-export function drawScreens(): void {
+function drawScreensImmediate(): void {
   const L = layoutNow();
   const f = frame();
   render.setBottomBand(app.screen === "play" ? bottomBand(L) / L.lh : 0);
@@ -571,4 +572,11 @@ function caption(L: Layout): void {
   if (!cap) return;
   const y = app.screen === "play" ? (L.landscape ? 108 : bottomBand(L) + 8) : 24;
   ui.place("caption-line", { anchor: "bottom", y }, () => ui.column("caption-col", () => para(T(cap.text), L.lw - 60, "caption-text", "caption-text", true), { style: "caption", align: "center" }));
+}
+
+export function drawScreens(): void {
+  if (app.screen !== "help") { drawScreensImmediate(); return; }
+  const actions = ["left","right","up","down","confirm","cancel","undo","hint","pause","camera"];
+  const version = JSON.stringify([(app as any).settings ?? (app as any).options ?? {}, (platform as any).options ?? {}, actions.map((action) => bindings(action))]);
+  ui.retain!("help-screen", version, drawScreensImmediate);
 }
