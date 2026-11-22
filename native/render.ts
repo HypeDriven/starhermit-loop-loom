@@ -581,6 +581,7 @@ export function applyLook(next: Look): void {
     vignette: { amount: 0.28, inner: 0.32, outer: 0.85, scale: [1, 0.9] },
   } : null;
   renderer.antialias = next.antialias;
+  renderer.motionBlur = next.bloom !== null ? { intensity: 0.25, samples: 8, maxPixels: 16, targetFps: 60, camera: false } : null;
   sparks.material = next.particles === "high" ? sparkHigh : sparkLow;
   const b = before?.budget, nb = next.budget;
   if (!before || before.detailed !== next.detailed || b!.material !== nb.material || b!.segments !== nb.segments || b!.yarn !== nb.yarn || b!.merge !== nb.merge) {
