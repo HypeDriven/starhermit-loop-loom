@@ -12,7 +12,7 @@
     "metadataSource": "starhermit.txt",
     "createdAt": "2026-09-01T07:01:03.158138+00:00",
     "coverArtSource": "manifest",
-    "coverArtUpdatedAt": "2026-11-26T21:06:34.693833+00:00",
+    "coverArtUpdatedAt": "2026-11-27T17:06:55.359855+00:00",
     "submittedByUserId": "2712e04e-461b-4d23-81ae-e40b429128a8",
     "submittedByUsername": "starhermit",
     "hosting": {
@@ -22,9 +22,9 @@
       "pinnedCommitSha": null,
       "deployedCommitSha": null,
       "deployError": null,
-      "deployedAt": "2026-11-26T21:06:34.682185+00:00",
+      "deployedAt": "2026-11-27T17:06:55.348613+00:00",
       "externalLaunchUrl": null,
-      "engineVersion": "1.51.0",
+      "engineVersion": "1.53.0",
       "deployWarning": null
     },
     "description": "Move matching yarn loops between pegs until every peg holds a single color.",
@@ -36,19 +36,19 @@
     "links": [],
     "isDisabled": false
   },
-  "publishedAt": "2026-11-26T21:06:34.944Z",
-  "sourceCommit": "7424c2d95229c2942f96140a3a2847f849015278",
-  "bytesReceived": 2375234,
-  "archiveSha256": "becebc8661063d3326850062352e13b2ed468c6587761f554d7bd983f1c9915d",
+  "publishedAt": "2026-11-27T17:06:55.527Z",
+  "sourceCommit": "29c67fdbe9c62da030c9160a71ea3331c8eb4977",
+  "bytesReceived": 2375276,
+  "archiveSha256": "dfffa54165431b473be4c50a8e7689b68dab48323a5dcc3428c215deb6fbae9a",
   "indexSha256": "c86c9beee3eea59850cb3e5a8039af309e4567ef5e4cf7b8523e4c6828f0f7cb",
   "result": {
     "clientPublished": true,
     "serverImageLoaded": false,
     "imageDigest": null,
-    "bytesReceived": 2375234,
+    "bytesReceived": 2375276,
     "mode": "replace",
     "filesRemoved": 0,
-    "engineVersion": "1.51.0",
+    "engineVersion": "1.53.0",
     "deployWarning": null
   },
   "liveVerification": {
